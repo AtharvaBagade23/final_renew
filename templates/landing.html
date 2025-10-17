@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RenewAI – Renewable Energy Site Analysis Platform</title>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e1a;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-gradient {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(ellipse at top, #1e1b4b 0%, #0a0e1a 50%);
+            z-index: -2;
+        }
+        .bg-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(236, 72, 153, 0.15) 0%, transparent 50%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Floating particles */
+        .particles {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: rgba(139, 92, 246, 0.5);
+            border-radius: 50%;
+            animation: float 20s infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
+        }
+
+        nav {
+            position: fixed;
+            width: 100%;
+            background: rgba(10, 14, 26, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        nav.scrolled {
+            background: rgba(10, 14, 26, 0.95);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.2rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+            cursor: pointer;
+        }
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        .nav-links a {
+            color: #94a3b8;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+            cursor: pointer;
+        }
+        .nav-links a:hover {
+            color: #8b5cf6;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+        .btn {
+            padding: 0.7rem 1.6rem;
+            border-radius: 0.7rem;
+            border: 2px solid transparent;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.95rem;
+        }
+        .btn-login {
+            background: transparent;
+            border-color: rgba(139, 92, 246, 0.5);
+            color: #a78bfa;
+        }
+        .btn-login:hover {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: #8b5cf6;
+            color: #c4b5fd;
+            transform: translateY(-2px);
+        }
+        .btn-signup {
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-signup::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        .btn-signup:hover::before {
+            left: 100%;
+        }
+        .btn-signup:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.5);
+        }
+
+        .section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 4rem 2rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+        }
+        .hero-content {
+            animation: fadeInUp 1s ease-out;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .hero h1 {
+            font-size: 3.5rem;
+            line-height: 1.2;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+        .gradient {
+            background: linear-gradient(135deg, #8b5cf6, #ec4899, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 3s ease infinite;
+        }
+        @keyframes gradientShift {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(20deg); }
+        }
+        .hero p {
+            margin-top: 1.5rem;
+            font-size: 1.3rem;
+            color: #94a3b8;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .hero-buttons {
+            margin-top: 2.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            color: white;
+            border: none;
+            padding: 1.2rem 2.5rem;
+            font-size: 1.15rem;
+            border-radius: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        .btn-primary:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(139, 92, 246, 0.5);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            padding: 1.2rem 2.5rem;
+            font-size: 1.15rem;
+            border-radius: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-secondary:hover {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: #8b5cf6;
+            transform: translateY(-3px);
+        }
+
+        /* Features Section */
+        .features {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+        .section-subtitle {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 1.2rem;
+            margin-bottom: 4rem;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        .feature-card {
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.6), rgba(49, 46, 129, 0.6));
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: #8b5cf6;
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.3);
+        }
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+        }
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .feature-card p {
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+
+        /* How It Works */
+        .steps-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+        .step {
+            text-align: center;
+            position: relative;
+        }
+        .step-number {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .step:nth-child(2) .step-number { animation-delay: 0.2s; }
+        .step:nth-child(3) .step-number { animation-delay: 0.4s; }
+        .step:nth-child(4) .step-number { animation-delay: 0.6s; }
+        .step h3 {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+        }
+        .step p {
+            color: #94a3b8;
+        }
+
+        /* Pricing Section */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        .pricing-card {
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.8), rgba(49, 46, 129, 0.8));
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            border-radius: 1.5rem;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .pricing-card.featured {
+            border-color: #8b5cf6;
+            transform: scale(1.05);
+        }
+        .pricing-card.featured::before {
+            content: 'POPULAR';
+            position: absolute;
+            top: 1.5rem;
+            right: -2rem;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            padding: 0.5rem 3rem;
+            transform: rotate(45deg);
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .pricing-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.3);
+        }
+        .pricing-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .price {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 1.5rem 0;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .price span {
+            font-size: 1.2rem;
+            color: #94a3b8;
+        }
+        .features-list {
+            list-style: none;
+            margin: 2rem 0;
+            text-align: left;
+        }
+        .features-list li {
+            padding: 0.8rem 0;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        .features-list li::before {
+            content: '✓';
+            color: #22c55e;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        /* Testimonials */
+        .testimonials-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        .testimonial-card {
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.6), rgba(49, 46, 129, 0.6));
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            transition: all 0.3s;
+        }
+        .testimonial-card:hover {
+            transform: translateY(-5px);
+            border-color: #8b5cf6;
+        }
+        .testimonial-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .testimonial-info h4 {
+            margin-bottom: 0.3rem;
+        }
+        .testimonial-info p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        .testimonial-text {
+            color: #cbd5e1;
+            line-height: 1.7;
+            font-style: italic;
+        }
+        .stars {
+            color: #f59e0b;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        /* Contact Section */
+        .contact-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: start;
+        }
+        .contact-info h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        .contact-info p {
+            color: #94a3b8;
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+        .contact-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: #cbd5e1;
+        }
+        .contact-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border-radius: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+        .contact-form {
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.8), rgba(49, 46, 129, 0.8));
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 1.5rem;
+            padding: 3rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+            font-weight: 600;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 0.7rem;
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            background: rgba(15, 23, 42, 0.6);
+            color: white;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            background: rgba(15, 23, 42, 0.8);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        /* Footer */
+        footer {
+            background: rgba(15, 23, 42, 0.8);
+            border-top: 1px solid rgba(139, 92, 246, 0.2);
+            padding: 3rem 2rem 1.5rem;
+            margin-top: 4rem;
+        }
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 3rem;
+            margin-bottom: 2rem;
+        }
+        .footer-section h3 {
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+        }
+        .footer-section ul {
+            list-style: none;
+        }
+        .footer-section ul li {
+            margin-bottom: 0.8rem;
+        }
+        .footer-section ul li a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        .footer-section ul li a:hover {
+            color: #8b5cf6;
+        }
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .social-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(139, 92, 246, 0.2);
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .social-icon:hover {
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            transform: translateY(-3px);
+        }
+        .footer-bottom {
+            text-align: center;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(139, 92, 246, 0.1);
+            color: #94a3b8;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(49, 46, 129, 0.95));
+            border: 1px solid rgba(139,92,246,0.3);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 440px;
+            color: white;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            margin: 1rem;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .close-modal {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close-modal:hover {
+            background: rgba(248, 113, 113, 0.2);
+            transform: rotate(90deg);
+        }
+        .modal-content h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .input-group {
+            position: relative;
+            margin-bottom: 1.2rem;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 0.95rem 1rem;
+            border-radius: 0.7rem;
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            background: rgba(15, 23, 42, 0.6);
+            color: white;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            background: rgba(15, 23, 42, 0.8);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+        }
+        .input-group input::placeholder {
+            color: #64748b;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 0.7rem;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            border: none;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 0.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+        }
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .submit-btn.loading {
+            pointer-events: none;
+        }
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .switch-link {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: color 0.3s;
+            font-size: 0.95rem;
+        }
+        .switch-link:hover { 
+            color: #8b5cf6; 
+        }
+        .notification {
+            position: fixed;
+            top: 100px;
+            right: 2rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(236, 72, 153, 0.95));
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.7rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 3000;
+            animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: none;
+            max-width: 350px;
+        }
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .notification.show {
+            display: block;
+        }
+        .notification.error {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95));
+        }
+        .notification.success {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
+        }
+
+        @media (max-width: 968px) {
+            .nav-links { display: none; }
+            .hero h1 { font-size: 2.5rem; }
+            .hero p { font-size: 1.1rem; }
+            .contact-container { grid-template-columns: 1fr; }
+            .modal-content { margin: 1rem; padding: 2rem; }
+            .notification { right: 1rem; left: 1rem; max-width: none; }
+            .pricing-card.featured { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-gradient"></div>
+    <div class="particles" id="particles"></div>
+
+    <nav id="navbar">
+        <div class="nav-container">
+            <div class="logo" onclick="scrollToSection('hero')">RenewAI</div>
+            <div class="nav-links">
+                <a onclick="scrollToSection('features')">Features</a>
+                <a onclick="scrollToSection('how-it-works')">How It Works</a>
+                <a onclick="scrollToSection('pricing')">Pricing</a>
+                <a onclick="scrollToSection('testimonials')">Testimonials</a>
+                <a onclick="scrollToSection('contact')">Contact</a>
+            </div>
+            <div class="nav-buttons">
+                <button class="btn btn-login" id="loginBtn">Login</button>
+                <button class="btn btn-signup" id="signupBtn">Sign Up</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="section hero" id="hero">
+        <div class="hero-content">
+            <h1>Empowering Smarter <span class="gradient">Renewable Energy</span> Decisions</h1>
+            <p>Analyze and identify the most suitable solar and wind energy sites using AI, geospatial data, and sustainability insights.</p>
+            <div class="hero-buttons">
+                <button class="btn-primary" id="getStarted">
+                    <span>Get Started</span>
+                </button>
+                <button class="btn-secondary" onclick="scrollToSection('features')">Learn More</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section features" id="features">
+        <div class="container">
+            <h2 class="section-title">Powerful <span class="gradient">Features</span></h2>
+            <p class="section-subtitle">Everything you need to make informed renewable energy decisions</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered Analysis</h3>
+                    <p>Advanced machine learning algorithms analyze environmental data to identify optimal locations for renewable energy installations.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🗺️</div>
+                    <h3>Geospatial Mapping</h3>
+                    <p>Interactive maps with real-time data visualization help you explore potential sites with comprehensive geographic insights.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">☀️</div>
+                    <h3>Solar Potential</h3>
+                    <p>Calculate solar irradiance, panel efficiency, and energy output predictions with precision weather modeling.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💨</div>
+                    <h3>Wind Analysis</h3>
+                    <p>Comprehensive wind speed patterns, turbulence analysis, and energy generation forecasts for wind farm planning.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Data Analytics</h3>
+                    <p>Detailed reports and visualizations that transform complex environmental data into actionable insights.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Sustainability Metrics</h3>
+                    <p>Track carbon reduction, ROI calculations, and environmental impact assessments for your renewable projects.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="section" id="how-it-works">
+        <div class="container">
+            <h2 class="section-title">How It <span class="gradient">Works</span></h2>
+            <p class="section-subtitle">Get started in four simple steps</p>
+            <div class="steps-container">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Select Location</h3>
+                    <p>Choose your region of interest using our interactive map interface or enter coordinates directly.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Configure Parameters</h3>
+                    <p>Set your project requirements including energy type, capacity needs, and environmental preferences.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>AI Analysis</h3>
+                    <p>Our AI processes satellite data, weather patterns, and geographic factors to identify optimal sites.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>Get Results</h3>
+                    <p>Receive comprehensive reports with visualizations, recommendations, and actionable insights.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="section" id="pricing">
+        <div class="container">
+            <h2 class="section-title">Choose Your <span class="gradient">Plan</span></h2>
+            <p class="section-subtitle">Flexible pricing for projects of any size</p>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Starter</h3>
+                    <div class="price">$49<span>/month</span></div>
+                    <ul class="features-list">
+                        <li>5 site analyses per month</li>
+                        <li>Basic AI recommendations</li>
+                        <li>Geospatial mapping</li>
+                        <li>Email support</li>
+                        <li>Export reports (PDF)</li>
+                    </ul>
+                    <button class="btn-primary" onclick="openModal('signup')">Get Started</button>
+                </div>
+                <div class="pricing-card featured">
+                    <h3>Professional</h3>
+                    <div class="price">$149<span>/month</span></div>
+                    <ul class="features-list">
+                        <li>Unlimited site analyses</li>
+                        <li>Advanced AI insights</li>
+                        <li>Real-time weather data</li>
+                        <li>Priority support</li>
+                        <li>API access</li>
+                        <li>Custom reporting</li>
+                        <li>Team collaboration</li>
+                    </ul>
+                    <button class="btn-primary" onclick="openModal('signup')">Get Started</button>
+                </div>
+                <div class="pricing-card">
+                    <h3>Enterprise</h3>
+                    <div class="price">Custom</div>
+                    <ul class="features-list">
+                        <li>Everything in Professional</li>
+                        <li>Dedicated account manager</li>
+                        <li>Custom AI models</li>
+                        <li>White-label solution</li>
+                        <li>SLA guarantee</li>
+                        <li>On-premise deployment</li>
+                        <li>Training & onboarding</li>
+                    </ul>
+                    <button class="btn-primary" onclick="scrollToSection('contact')">Contact Sales</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="section" id="testimonials">
+        <div class="container">
+            <h2 class="section-title">What Our <span class="gradient">Clients Say</span></h2>
+            <p class="section-subtitle">Trusted by renewable energy leaders worldwide</p>
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <p class="testimonial-text">"RenewAI helped us identify 3 optimal solar farm locations that we never would have considered. The AI analysis was incredibly accurate and saved us months of research."</p>
+                    <div class="testimonial-header">
+                        <div class="avatar">SM</div>
+                        <div class="testimonial-info">
+                            <h4>Sarah Mitchell</h4>
+                            <p>CEO, SolarTech Solutions</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <p class="testimonial-text">"The geospatial mapping and wind analysis features are game-changers. We've increased our project efficiency by 40% since implementing RenewAI into our workflow."</p>
+                    <div class="testimonial-header">
+                        <div class="avatar">JC</div>
+                        <div class="testimonial-info">
+                            <h4>James Chen</h4>
+                            <p>Director of Operations, WindPower Global</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="stars">★★★★★</div>
+                    <p class="testimonial-text">"Outstanding platform! The sustainability metrics and ROI calculations have been instrumental in securing funding for our renewable energy projects."</p>
+                    <div class="testimonial-header">
+                        <div class="avatar">EP</div>
+                        <div class="testimonial-info">
+                            <h4>Emily Patel</h4>
+                            <p>Project Manager, GreenFuture Energy</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="section" id="contact">
+        <div class="container">
+            <div class="contact-container">
+                <div class="contact-info">
+                    <h2>Get in <span class="gradient">Touch</span></h2>
+                    <p>Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.</p>
+                    <div class="contact-details">
+                        <div class="contact-item">
+                            <div class="contact-icon">📧</div>
+                            <div>
+                                <strong>Email</strong><br>
+                                <span>hello@renewai.com</span>
+                            </div>
+                        </div>
+                        <div class="contact-item">
+                            <div class="contact-icon">📞</div>
+                            <div>
+                                <strong>Phone</strong><br>
+                                <span>+1 (555) 123-4567</span>
+                            </div>
+                        </div>
+                        <div class="contact-item">
+                            <div class="contact-icon">📍</div>
+                            <div>
+                                <strong>Address</strong><br>
+                                <span>123 Energy Street, San Francisco, CA 94102</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <form class="contact-form" id="contactForm">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" placeholder="Your name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" placeholder="your@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Subject</label>
+                        <input type="text" placeholder="How can we help?" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Message</label>
+                        <textarea placeholder="Tell us more about your project..." required></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn" id="contactSubmit">
+                        <span id="contactBtnText">Send Message</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3 class="logo">RenewAI</h3>
+                <p style="color: #94a3b8; margin-top: 1rem;">Empowering the future of renewable energy through intelligent site analysis and AI-powered insights.</p>
+                <div class="social-links">
+                    <div class="social-icon">𝕏</div>
+                    <div class="social-icon">in</div>
+                    <div class="social-icon">f</div>
+                    <div class="social-icon">📷</div>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>Product</h3>
+                <ul>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#pricing">Pricing</a></li>
+                    <li><a href="#how-it-works">How It Works</a></li>
+                    <li><a href="#">API Documentation</a></li>
+                    <li><a href="#">Integrations</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Company</h3>
+                <ul>
+                    <li><a href="#">About Us</a></li>
+                    <li><a href="#">Careers</a></li>
+                    <li><a href="#">Blog</a></li>
+                    <li><a href="#">Press Kit</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Legal</h3>
+                <ul>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms of Service</a></li>
+                    <li><a href="#">Cookie Policy</a></li>
+                    <li><a href="#">GDPR</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 RenewAI. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Notification Toast -->
+    <div class="notification" id="notification"></div>
+
+    <!-- Auth Modal -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <button class="close-modal" id="closeModal">&times;</button>
+            <h2 id="modalTitle">Login</h2>
+            <form id="authForm">
+                <div class="input-group" id="nameGroup" style="display:none;">
+                    <input type="text" id="nameField" placeholder="Full Name" autocomplete="name">
+                </div>
+                <div class="input-group" id="companyGroup" style="display:none;">
+                    <input type="text" id="companyField" placeholder="Organization (Optional)" autocomplete="organization">
+                </div>
+                <div class="input-group">
+                    <input type="email" id="emailField" placeholder="Email" autocomplete="email" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="passwordField" placeholder="Password" autocomplete="current-password" required>
+                </div>
+                <button type="submit" class="submit-btn" id="authSubmit">
+                    <span id="btnText">Continue</span>
+                </button>
+            </form>
+            <div class="switch-link" id="switchMode">Don't have an account? Sign Up</div>
+        </div>
+    </div>
+
+    <script>
+        // Create particles
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 30; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + '%';
+            particle.style.animationDelay = Math.random() * 20 + 's';
+            particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+            particlesContainer.appendChild(particle);
+        }
+
+        // Navbar scroll effect
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Smooth scroll
+        function scrollToSection(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Auth Modal
+        const modal = document.getElementById('authModal');
+        const loginBtn = document.getElementById('loginBtn');
+        const signupBtn = document.getElementById('signupBtn');
+        const getStarted = document.getElementById('getStarted');
+        const switchMode = document.getElementById('switchMode');
+        const closeModal = document.getElementById('closeModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const authForm = document.getElementById('authForm');
+        const authSubmit = document.getElementById('authSubmit');
+        const btnText = document.getElementById('btnText');
+        const nameGroup = document.getElementById('nameGroup');
+        const companyGroup = document.getElementById('companyGroup');
+        const nameField = document.getElementById('nameField');
+        const companyField = document.getElementById('companyField');
+        const emailField = document.getElementById('emailField');
+        const passwordField = document.getElementById('passwordField');
+        const notification = document.getElementById('notification');
+        
+        let mode = "login";
+        let isLoading = false;
+
+        loginBtn.onclick = () => openModal("login");
+        signupBtn.onclick = () => openModal("signup");
+        getStarted.onclick = () => openModal("signup");
+        closeModal.onclick = () => modal.classList.remove('show');
+
+        switchMode.onclick = () => {
+            if (mode === "login") openModal("signup");
+            else openModal("login");
+        };
+
+        function openModal(newMode) {
+            mode = newMode;
+            modal.classList.add('show');
+            authForm.reset();
+            
+            if (newMode === "login") {
+                modalTitle.innerText = "Login";
+                nameGroup.style.display = "none";
+                companyGroup.style.display = "none";
+                nameField.removeAttribute('required');
+                switchMode.innerText = "Don't have an account? Sign Up";
+                btnText.innerText = "Login";
+            } else {
+                modalTitle.innerText = "Sign Up";
+                nameGroup.style.display = "block";
+                companyGroup.style.display = "block";
+                nameField.setAttribute('required', '');
+                switchMode.innerText = "Already have an account? Login";
+                btnText.innerText = "Create Account";
+            }
+        }
+
+        window.onclick = (e) => { 
+            if (e.target === modal) modal.classList.remove('show'); 
+        };
+
+        function showNotification(message, type = 'success') {
+            notification.innerText = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+
+        authForm.onsubmit = async (e) => {
+            e.preventDefault();
+            
+            if (isLoading) return;
+
+            const email = emailField.value.trim();
+            const password = passwordField.value.trim();
+            const name = nameField.value.trim();
+            const company = companyField.value.trim();
+
+            if (!email || !password || (mode === "signup" && !name)) {
+                showNotification("Please fill all required fields.", "error");
+                return;
+            }
+
+            isLoading = true;
+            authSubmit.disabled = true;
+            authSubmit.classList.add('loading');
+            btnText.innerHTML = '<span class="spinner"></span>';
+
+            const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
+            const payload = mode === "login"
+                ? { email, password }
+                : { name, email, password, company };
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showNotification(
+                        mode === "login" ? "Login successful! Redirecting..." : "Account created successfully! Redirecting...",
+                        "success"
+                    );
+                    setTimeout(() => { 
+                        window.location.href = "/index"; 
+                    }, 1500);
+                } else {
+                    showNotification(data.error || "Something went wrong. Please try again.", "error");
+                    isLoading = false;
+                    authSubmit.disabled = false;
+                    authSubmit.classList.remove('loading');
+                    btnText.innerText = mode === "login" ? "Login" : "Create Account";
+                }
+            } catch (err) {
+                showNotification("Network error. Please check your connection.", "error");
+                isLoading = false;
+                authSubmit.disabled = false;
+                authSubmit.classList.remove('loading');
+                btnText.innerText = mode === "login" ? "Login" : "Create Account";
+            }
+        };
+
+        // Contact Form
+        const contactForm = document.getElementById('contactForm');
+        const contactSubmit = document.getElementById('contactSubmit');
+        const contactBtnText = document.getElementById('contactBtnText');
+        let isContactLoading = false;
+
+        contactForm.onsubmit = async (e) => {
+            e.preventDefault();
+            
+            if (isContactLoading) return;
+
+            isContactLoading = true;
+            contactSubmit.disabled = true;
+            contactSubmit.classList.add('loading');
+            contactBtnText.innerHTML = '<span class="spinner"></span>';
+
+            // Simulate API call
+            try {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                showNotification("Message sent successfully! We'll get back to you soon.", "success");
+                contactForm.reset();
+            } catch (err) {
+                showNotification("Failed to send message. Please try again.", "error");
+            } finally {
+                isContactLoading = false;
+                contactSubmit.disabled = false;
+                contactSubmit.classList.remove('loading');
+                contactBtnText.innerText = "Send Message";
+            }
+        };
+    </script>
+
+</body>
+</html>

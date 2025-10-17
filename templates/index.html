@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renewable Energy Site Analysis</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1e293b;
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1e293b;
+            --gray-900: #0f172a;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--gray-800);
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.75rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            border: none;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .btn-icon:hover {
+            background: var(--gray-200);
+            transform: translateY(-2px);
+        }
+
+        .btn-icon.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-icon.logout {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-icon.logout:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--danger);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Card Styling */
+        .card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card:hover {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            transform: none;
+            /* Remove transform to prevent z-index issues */
+        }
+
+        /* Map Container */
+        .map-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        #map {
+            height: 650px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Fix Leaflet draw controls z-index */
+        .leaflet-top,
+        .leaflet-bottom {
+            z-index: 400 !important;
+        }
+
+        .leaflet-draw-toolbar {
+            z-index: 500 !important;
+        }
+
+        .leaflet-draw-actions {
+            z-index: 500 !important;
+        }
+
+        .leaflet-control {
+            z-index: 400 !important;
+        }
+
+        /* Ensure drawn shapes stay below UI */
+        .leaflet-overlay-pane {
+            z-index: 1 !important;
+        }
+
+        .leaflet-pane {
+            z-index: auto !important;
+        }
+
+        /* Controls Panel */
+        .controls {
+            padding: 2rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        .controls h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
+            padding: 1.25rem;
+            border-radius: 16px;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .info-box p {
+            margin: 0.5rem 0;
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: var(--gray-900);
+        }
+
+        /* Form Group */
+        .form-group {
+            margin: 1.5rem 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.75rem;
+            color: var(--gray-700);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            margin: 0.75rem 0;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-200);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Results Section */
+        .results {
+            display: none;
+            animation: slideUp 0.5s ease;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 2rem 2rem 0;
+        }
+
+        .result-header h2 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+
+        /* Metadata */
+        .metadata {
+            background: linear-gradient(135deg, #e0e7ff 0%, #ddd6fe 100%);
+            padding: 1.5rem;
+            border-radius: 16px;
+            margin: 0 2rem 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .metadata-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .metadata-icon {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .metadata-text {
+            flex: 1;
+        }
+
+        .metadata-label {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .metadata-value {
+            font-size: 0.95rem;
+            color: var(--gray-900);
+            font-weight: 600;
+        }
+
+        /* Result Cards */
+        .result-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+            border: 2px solid var(--gray-100);
+        }
+
+        .result-card h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--gray-900);
+        }
+
+        /* Connectivity Score */
+        .connectivity-score {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 16px;
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .connectivity-score::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .connectivity-score h3 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0;
+            color: white;
+            position: relative;
+            z-index: 1;
+        }
+
+        .connectivity-score p {
+            margin-top: 0.5rem;
+            opacity: 0.95;
+            font-size: 1.1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Infrastructure Grid */
+        .infra-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .infra-item {
+            background: var(--gray-50);
+            padding: 1.25rem;
+            border-radius: 16px;
+            border: 2px solid var(--gray-100);
+            transition: all 0.3s;
+        }
+
+        .infra-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .infra-item h4 {
+            color: var(--primary);
+            font-size: 0.85rem;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .infra-item p {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            margin: 0.5rem 0;
+        }
+
+        .infra-item strong {
+            color: var(--gray-900);
+        }
+
+        /* Score Badges */
+        .score-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 700;
+            margin: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .score-excellent {
+            background: var(--success);
+            color: white;
+        }
+
+        .score-good {
+            background: #84cc16;
+            color: white;
+        }
+
+        .score-marginal {
+            background: var(--warning);
+            color: white;
+        }
+
+        .score-poor {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Suggestions */
+        .suggestions {
+            background: var(--gray-50);
+            padding: 1.5rem;
+            border-radius: 16px;
+            margin-top: 1.5rem;
+            border: 2px solid var(--gray-100);
+        }
+
+        .suggestions h4 {
+            color: var(--gray-900);
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .suggestions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .suggestions li {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--gray-200);
+            color: var(--gray-600);
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+        }
+
+        .suggestions li:last-child {
+            border-bottom: none;
+        }
+
+        .suggestions li::before {
+            content: '→';
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            animation: slideUp 0.5s ease;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .loading-content {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .spinner {
+            border: 4px solid var(--gray-200);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Restricted Warning */
+        .restricted-warning {
+            display: none;
+            animation: slideUp 0.5s ease;
+        }
+
+        .restricted-warning.show {
+            display: block;
+        }
+
+        .restricted-content {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 20px;
+            margin: 2rem;
+        }
+
+        .restricted-content h2 {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 1.75rem;
+        }
+
+        .violation-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 1rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            backdrop-filter: blur(10px);
+        }
+
+        /* History Sidebar */
+        .history-sidebar {
+            position: fixed;
+            right: -450px;
+            top: 0;
+            width: 450px;
+            height: 100vh;
+            background: white;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+            transition: right 0.3s ease;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .history-sidebar.open {
+            right: 0;
+        }
+
+        .history-header {
+            padding: 2rem;
+            border-bottom: 2px solid var(--gray-100);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-header h2 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--gray-900);
+        }
+
+        .history-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .history-item {
+            background: var(--gray-50);
+            border: 2px solid var(--gray-200);
+            border-radius: 16px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .history-item:hover {
+            border-color: var(--primary);
+            transform: translateX(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.75rem;
+        }
+
+        .history-item-title {
+            font-weight: 700;
+            color: var(--gray-900);
+            font-size: 1rem;
+        }
+
+        .history-item-date {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+        }
+
+        .history-item-details {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+
+        .history-tag {
+            padding: 0.25rem 0.75rem;
+            background: white;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--gray-600);
+        }
+
+        .history-empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1999;
+            display: none;
+        }
+
+        .overlay.show {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                max-width: 600px;
+                margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.25rem;
+            }
+
+            .history-sidebar {
+                width: 100%;
+                right: -100%;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <h1>
+                <span>🌞</span>
+                Renewable Energy Analysis
+            </h1>
+            <div class="header-actions">
+                <button class="btn-icon" id="historyBtn" title="Analysis History">
+                    <span>📋</span>
+                    <span class="badge" id="historyCount">0</span>
+                </button>
+                <button onclick="handleLogout()" class="btn-icon logout" id="logoutBtn" title="Logout">
+                    <i data-lucide="log-out"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="main-grid">
+            <!-- Map Section -->
+            <div class="card">
+                <div id="map"></div>
+            </div>
+
+            <!-- Controls Section -->
+            <div class="card controls">
+                <h3>📍 Site Selection</h3>
+
+                <div class="info-box">
+                    <p><strong>Quick Start Guide:</strong></p>
+                    <p>1. Draw a polygon on the map</p>
+                    <p>2. Select analysis type</p>
+                    <p>3. Click "Analyze Site"</p>
+                    <p>4. Review results & download report</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="analysisType">🔍 Analysis Type</label>
+                    <select id="analysisType">
+                        <option value="both">Both (Solar + Wind)</option>
+                        <option value="solar">Solar Only</option>
+                        <option value="wind">Wind Only</option>
+                    </select>
+                </div>
+
+                <button id="analyzeBtn" class="btn btn-primary" disabled>
+                    <span>🔍</span>
+                    Analyze Site
+                </button>
+
+                <button id="clearBtn" class="btn btn-secondary">
+                    <span>🗑️</span>
+                    Clear Selection
+                </button>
+
+                <div id="coordsInfo" class="info-box" style="display: none;">
+                    <p><strong>Selected Area:</strong></p>
+                    <p id="pointCount">0 points</p>
+                    <p id="areaInfo"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div class="card loading" id="loading">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p style="color: var(--gray-700); font-weight: 600;">Analyzing site data...</p>
+                <p style="color: var(--gray-600); font-size: 0.9rem; margin-top: 0.5rem;">This may take a moment</p>
+            </div>
+        </div>
+
+        <!-- Restricted Warning -->
+        <div class="card restricted-warning" id="restrictedWarning">
+            <div class="restricted-content">
+                <h2>⚠️ Site Restricted</h2>
+                <p id="restrictedMessage"></p>
+                <div id="violations"></div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="card results" id="results">
+            <div class="result-header">
+                <h2>Analysis Results</h2>
+                <button id="downloadPdfBtn" class="btn btn-success" style="width: auto; padding: 0.75rem 1.5rem;">
+                    <span>📄</span>
+                    Download Report
+                </button>
+            </div>
+
+            <div class="metadata" id="metadata"></div>
+
+            <div style="padding: 0 2rem 2rem;">
+                <div id="infraSection" class="result-card">
+                    <h3>🏗️ Infrastructure Connectivity</h3>
+                    <div id="connectivityScore"></div>
+                    <div id="infraDetails" class="infra-grid"></div>
+                </div>
+
+                <div id="solarSection" class="result-card" style="display: none;">
+                    <h3>☀️ Solar Energy Potential</h3>
+                    <div id="solarResults"></div>
+                </div>
+
+                <div id="windSection" class="result-card" style="display: none;">
+                    <h3>💨 Wind Energy Potential</h3>
+                    <div id="windResults"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Sidebar -->
+    <div class="overlay" id="overlay"></div>
+    <div class="history-sidebar" id="historySidebar">
+        <div class="history-header">
+            <h2>Analysis History</h2>
+            <button class="btn-icon" id="closeHistoryBtn">
+                <span>✕</span>
+            </button>
+        </div>
+        <div class="history-content" id="historyContent">
+            <div class="history-empty">
+                <div class="history-empty-icon">📊</div>
+                <p><strong>No analysis history yet</strong></p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Your previous analyses will appear here</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+
+    <script>
+        lucide.createIcons(); // activate icons
+        // In-memory storage for analysis history
+        let analysisHistory = [];
+        let lastAnalysisData = null;
+        let map, drawnItems, currentPolygon, coordinates = [];
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function () {
+            initializeMap();
+            initializeEventListeners();
+        });
+
+        function initializeMap() {
+            map = L.map('map').setView([20.5937, 78.9629], 5);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            const drawControl = new L.Control.Draw({
+                position: 'topright',
+                draw: {
+                    polygon: {
+                        allowIntersection: false,
+                        showArea: true,
+                        shapeOptions: {
+                            color: '#6366f1',
+                            fillColor: '#6366f1',
+                            fillOpacity: 0.3,
+                            weight: 3
+                        }
+                    },
+                    rectangle: {
+                        shapeOptions: {
+                            color: '#6366f1',
+                            fillColor: '#6366f1',
+                            fillOpacity: 0.3,
+                            weight: 3
+                        }
+                    },
+                    circle: false,
+                    polyline: false,
+                    marker: false,
+                    circlemarker: false
+                },
+                edit: {
+                    featureGroup: drawnItems,
+                    remove: true,
+                    edit: true
+                }
+            });
+            map.addControl(drawControl);
+
+            setupMapEvents();
+        }
+
+        function setupMapEvents() {
+            map.on(L.Draw.Event.CREATED, function (event) {
+                const layer = event.layer;
+
+                if (currentPolygon) {
+                    drawnItems.removeLayer(currentPolygon);
+                }
+
+                drawnItems.addLayer(layer);
+                currentPolygon = layer;
+
+                if (layer instanceof L.Polygon || layer instanceof L.Rectangle) {
+                    const latlngs = layer.getLatLngs()[0];
+                    coordinates = latlngs.map(latlng => ({
+                        lat: latlng.lat,
+                        lng: latlng.lng
+                    }));
+
+                    updateCoordinateInfo(latlngs);
+                }
+            });
+
+            map.on(L.Draw.Event.EDITED, function (event) {
+                const layers = event.layers;
+                layers.eachLayer(function (layer) {
+                    if (layer instanceof L.Polygon || layer instanceof L.Rectangle) {
+                        const latlngs = layer.getLatLngs()[0];
+                        coordinates = latlngs.map(latlng => ({
+                            lat: latlng.lat,
+                            lng: latlng.lng
+                        }));
+                        updateCoordinateInfo(latlngs);
+                    }
+                });
+            });
+
+            map.on(L.Draw.Event.DELETED, function () {
+                clearSelection();
+            });
+        }
+
+        function updateCoordinateInfo(latlngs) {
+            document.getElementById('analyzeBtn').disabled = false;
+            document.getElementById('coordsInfo').style.display = 'block';
+            document.getElementById('pointCount').textContent = `${coordinates.length} points`;
+
+            const area = L.GeometryUtil.geodesicArea(latlngs);
+            const areaKm2 = (area / 1000000).toFixed(2);
+            document.getElementById('areaInfo').textContent = `Area: ${areaKm2} km²`;
+        }
+
+        function clearSelection() {
+            if (currentPolygon) {
+                drawnItems.removeLayer(currentPolygon);
+                currentPolygon = null;
+                coordinates = [];
+                document.getElementById('analyzeBtn').disabled = true;
+                document.getElementById('coordsInfo').style.display = 'none';
+                document.getElementById('results').classList.remove('show');
+                document.getElementById('restrictedWarning').classList.remove('show');
+            }
+        }
+
+        function initializeEventListeners() {
+            // Clear button
+            document.getElementById('clearBtn').addEventListener('click', clearSelection);
+
+            // Analyze button
+            document.getElementById('analyzeBtn').addEventListener('click', analyzeSite);
+
+            // Download PDF button
+            document.getElementById('downloadPdfBtn').addEventListener('click', downloadReport);
+
+            // History sidebar controls
+            document.getElementById('historyBtn').addEventListener('click', openHistorySidebar);
+            document.getElementById('closeHistoryBtn').addEventListener('click', closeHistorySidebar);
+            document.getElementById('overlay').addEventListener('click', closeHistorySidebar);
+
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+        }
+
+        async function handleLogout() {
+            const confirmed = confirm('Are you sure you want to logout?');
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    // Clear any frontend variables if applicable
+                    if (typeof analysisHistory !== 'undefined') analysisHistory = [];
+                    if (typeof lastAnalysisData !== 'undefined') lastAnalysisData = null;
+
+                    // Show feedback (optional)
+                    alert('Logged out successfully!');
+
+                    // Redirect to landing page
+                    window.location.href = '/';
+                } else {
+                    alert(data.error || 'Logout failed. Please try again.');
+                }
+            } catch (err) {
+                console.error('Logout error:', err);
+                alert('An error occurred while logging out. Please try again.');
+            }
+        }
+
+        async function analyzeSite() {
+            if (coordinates.length < 3) {
+                alert('Please draw a polygon with at least 3 points');
+                return;
+            }
+
+            const analysisType = document.getElementById('analysisType').value;
+
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('restrictedWarning').classList.remove('show');
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        coordinates: coordinates,
+                        analysis_type: analysisType
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.restricted) {
+                        displayRestrictedWarning(data);
+                    } else {
+                        lastAnalysisData = data;
+                        displayResults(data);
+                        saveToHistory(data);
+                    }
+                } else if (data.restricted) {
+                    displayRestrictedWarning(data);
+                    saveToHistory(data);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to analyze site: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+
+        function displayRestrictedWarning(data) {
+            const warningDiv = document.getElementById('restrictedWarning');
+            const messageDiv = document.getElementById('restrictedMessage');
+            const violationsDiv = document.getElementById('violations');
+
+            messageDiv.textContent = data.message || 'This site is in or near a restricted area and cannot be used for renewable energy projects.';
+
+            if (data.restriction_details && data.restriction_details.violations) {
+                let violationsHtml = '<h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">Safety Violations:</h3>';
+                data.restriction_details.violations.forEach(v => {
+                    violationsHtml += `
+                        <div class="violation-item">
+                            <strong>${v.facility}</strong> (${v.type})<br>
+                            Distance: ${v.distance} km | Required: ${v.required_distance} km<br>
+                            <span style="color: #fef08a; font-weight: 600;">⚠ ${v.shortage} km too close</span>
+                        </div>
+                    `;
+                });
+                violationsDiv.innerHTML = violationsHtml;
+            }
+
+            warningDiv.classList.add('show');
+            warningDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function displayResults(data) {
+            // Metadata
+            const metadataHtml = `
+                <div class="metadata-item">
+                    <div class="metadata-icon">📍</div>
+                    <div class="metadata-text">
+                        <div class="metadata-label">Centroid</div>
+                        <div class="metadata-value">${data.metadata.centroid[0].toFixed(4)}, ${data.metadata.centroid[1].toFixed(4)}</div>
+                    </div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-icon">🌤️</div>
+                    <div class="metadata-text">
+                        <div class="metadata-label">Weather Source</div>
+                        <div class="metadata-value">${data.metadata.weather_source}</div>
+                    </div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-icon">🗺️</div>
+                    <div class="metadata-text">
+                        <div class="metadata-label">Infrastructure Elements</div>
+                        <div class="metadata-value">${data.metadata.osm_elements}</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('metadata').innerHTML = metadataHtml;
+
+            // Infrastructure Analysis
+            if (data.infrastructure_analysis) {
+                const infra = data.infrastructure_analysis;
+                const score = infra.connectivity_score || 0;
+
+                let scoreColor = '#ef4444';
+                if (score >= 75) scoreColor = '#10b981';
+                else if (score >= 50) scoreColor = '#f59e0b';
+
+                document.getElementById('connectivityScore').innerHTML = `
+                    <div class="connectivity-score" style="background: linear-gradient(135deg, ${scoreColor} 0%, ${scoreColor}dd 100%);">
+                        <h3>${score}/100</h3>
+                        <p>Connectivity Score</p>
+                    </div>
+                `;
+
+                let infraHtml = '';
+                const infraItems = [
+                    { key: 'power_grid', icon: '⚡', label: 'Power Grid' },
+                    { key: 'substation', icon: '🔌', label: 'Substation' },
+                    { key: 'major_road', icon: '🛣️', label: 'Major Road' },
+                    { key: 'railway', icon: '🚂', label: 'Railway' },
+                    { key: 'fuel_station', icon: '⛽', label: 'Fuel Station' }
+                ];
+
+                infraItems.forEach(item => {
+                    const itemData = infra[item.key];
+                    if (itemData && itemData.distance_km) {
+                        infraHtml += `
+                            <div class="infra-item">
+                                <h4>${item.icon} ${item.label}</h4>
+                                <p><strong>Distance:</strong> ${itemData.distance_km} km</p>
+                                <p><strong>Nearest:</strong> ${itemData.nearest || 'N/A'}</p>
+                                <p><strong>Count:</strong> ${itemData.count || 0}</p>
+                            </div>
+                        `;
+                    }
+                });
+
+                document.getElementById('infraDetails').innerHTML = infraHtml || '<p style="color: var(--gray-600);">No infrastructure data available</p>';
+            }
+
+            // Solar Results
+            const solarSection = document.getElementById('solarSection');
+            if (data.solar) {
+                solarSection.style.display = 'block';
+                document.getElementById('solarResults').innerHTML = generateResultHtml(data.solar);
+            } else {
+                solarSection.style.display = 'none';
+            }
+
+            // Wind Results
+            const windSection = document.getElementById('windSection');
+            if (data.wind) {
+                windSection.style.display = 'block';
+                document.getElementById('windResults').innerHTML = generateResultHtml(data.wind);
+            } else {
+                windSection.style.display = 'none';
+            }
+
+            document.getElementById('results').classList.add('show');
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function generateResultHtml(result) {
+            const scoreClass = `score-${result.category.toLowerCase()}`;
+            const feasibleClass = result.feasible === 'Yes' ? 'feasible-yes' : 'feasible-no';
+
+            let html = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
+                        <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Feasibility</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: ${result.feasible === 'Yes' ? 'var(--success)' : 'var(--danger)'};">${result.feasible}</div>
+                    </div>
+                    <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
+                        <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Score</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900);">${result.score}%</div>
+                    </div>
+                    <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
+                        <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Category</div>
+                        <div><span class="score-badge ${scoreClass}">${result.category}</span></div>
+                    </div>
+                </div>
+            `;
+
+            if (Object.keys(result.suggestions).length > 0) {
+                html += '<div class="suggestions"><h4>💡 Improvement Suggestions</h4><ul>';
+                for (const [param, suggestion] of Object.entries(result.suggestions)) {
+                    html += `<li><strong>${param}:</strong> ${suggestion}</li>`;
+                }
+                html += '</ul></div>';
+            } else {
+                html += '<div class="suggestions"><p style="color: var(--success); font-weight: 600; text-align: center;">✅ Site meets all optimal conditions!</p></div>';
+            }
+
+            return html;
+        }
+
+        async function downloadReport() {
+            if (!lastAnalysisData) {
+                alert('No analysis data available');
+                return;
+            }
+
+            try {
+                const response = await fetch('/generate-report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(lastAnalysisData)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `renewable_energy_report_${new Date().getTime()}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    alert('Failed to generate PDF report');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to download report: ' + error.message);
+            }
+        }
+
+        // History Management
+        function saveToHistory(data) {
+            const historyItem = {
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                coordinates: coordinates,
+                analysisType: document.getElementById('analysisType').value,
+                restricted: data.restricted || false,
+                data: data
+            };
+
+            analysisHistory.unshift(historyItem);
+
+            // Keep only last 50 analyses
+            if (analysisHistory.length > 50) {
+                analysisHistory = analysisHistory.slice(0, 50);
+            }
+
+            updateHistoryDisplay();
+            updateHistoryBadge();
+        }
+
+        function updateHistoryDisplay() {
+            const historyContent = document.getElementById('historyContent');
+
+            if (analysisHistory.length === 0) {
+                historyContent.innerHTML = `
+                    <div class="history-empty">
+                        <div class="history-empty-icon">📊</div>
+                        <p><strong>No analysis history yet</strong></p>
+                        <p style="font-size: 0.9rem; margin-top: 0.5rem;">Your previous analyses will appear here</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            analysisHistory.forEach(item => {
+                const date = new Date(item.timestamp);
+                const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+
+                let statusBadge = '';
+                if (item.restricted) {
+                    statusBadge = '<span class="history-tag" style="background: var(--danger); color: white;">⚠ Restricted</span>';
+                } else {
+                    statusBadge = '<span class="history-tag" style="background: var(--success); color: white;">✓ Analyzed</span>';
+                }
+
+                let typeBadge = '';
+                if (item.analysisType === 'both') {
+                    typeBadge = '<span class="history-tag">☀️💨 Both</span>';
+                } else if (item.analysisType === 'solar') {
+                    typeBadge = '<span class="history-tag">☀️ Solar</span>';
+                } else {
+                    typeBadge = '<span class="history-tag">💨 Wind</span>';
+                }
+
+                html += `
+                    <div class="history-item" onclick="loadHistoryItem(${item.id})">
+                        <div class="history-item-header">
+                            <div class="history-item-title">Analysis #${item.id}</div>
+                            <div class="history-item-date">${formattedDate}</div>
+                        </div>
+                        <p style="color: var(--gray-600); font-size: 0.85rem; margin: 0.5rem 0;">
+                            ${item.coordinates.length} points • ${item.data.metadata ? item.data.metadata.centroid.map(c => c.toFixed(2)).join(', ') : 'N/A'}
+                        </p>
+                        <div class="history-item-details">
+                            ${statusBadge}
+                            ${typeBadge}
+                        </div>
+                    </div>
+                `;
+            });
+
+            historyContent.innerHTML = html;
+        }
+
+        function updateHistoryBadge() {
+            document.getElementById('historyCount').textContent = analysisHistory.length;
+        }
+
+        function loadHistoryItem(itemId) {
+            const item = analysisHistory.find(h => h.id === itemId);
+            if (!item) return;
+
+            // Clear current selection
+            clearSelection();
+
+            // Restore coordinates and draw on map
+            coordinates = item.coordinates;
+            const latlngs = coordinates.map(c => L.latLng(c.lat, c.lng));
+
+            currentPolygon = L.polygon(latlngs, {
+                color: '#6366f1',
+                fillColor: '#6366f1',
+                fillOpacity: 0.3,
+                weight: 3
+            });
+            drawnItems.addLayer(currentPolygon);
+
+            // Zoom to polygon
+            map.fitBounds(currentPolygon.getBounds());
+
+            // Update UI
+            updateCoordinateInfo(latlngs);
+            document.getElementById('analysisType').value = item.analysisType;
+
+            // Display results
+            lastAnalysisData = item.data;
+            if (item.restricted) {
+                displayRestrictedWarning(item.data);
+            } else {
+                displayResults(item.data);
+            }
+
+            // Close sidebar
+            closeHistorySidebar();
+        }
+
+        function openHistorySidebar() {
+            document.getElementById('historySidebar').classList.add('open');
+            document.getElementById('overlay').classList.add('show');
+            document.getElementById('historyBtn').classList.add('active');
+        }
+
+        function closeHistorySidebar() {
+            document.getElementById('historySidebar').classList.remove('open');
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('historyBtn').classList.remove('active');
+        }
+
+        // Make loadHistoryItem available globally
+        window.loadHistoryItem = loadHistoryItem;
+    </script>
+</body>
+
+</html>
