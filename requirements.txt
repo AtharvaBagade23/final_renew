@@ -1,0 +1,9 @@
+Flask
+Flask-Cors
+joblib
+pandas
+numpy
+scikit-learn
+matplotlib
+reportlab
+gunicorn
