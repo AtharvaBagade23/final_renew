@@ -1175,51 +1175,134 @@
             const messageDiv = document.getElementById('restrictedMessage');
             const violationsDiv = document.getElementById('violations');
 
-            messageDiv.textContent = data.message || 'This site is in or near a restricted area and cannot be used for renewable energy projects.';
+            messageDiv.innerHTML = `
+        <p style="font-size: 1.1rem; margin-bottom: 1rem;">
+            ${data.message || 'This site is located in or near a restricted area and cannot be used for renewable energy projects.'}
+        </p>
+        <p style="font-size: 0.95rem; opacity: 0.95;">
+            Renewable energy projects require safe distances from sensitive facilities to ensure public safety and comply with regulations.
+        </p>
+    `;
 
-            if (data.restriction_details && data.restriction_details.violations) {
-                let violationsHtml = '<h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">Safety Violations:</h3>';
+            if (data.restriction_details && data.restriction_details.violations && data.restriction_details.violations.length > 0) {
+                let violationsHtml = '<h3 style="margin-top: 1.5rem; margin-bottom: 1rem; font-size: 1.3rem;">⚠️ Safety Distance Violations:</h3>';
+
                 data.restriction_details.violations.forEach(v => {
+                    const shortagePercent = ((v.shortage / v.required_distance) * 100).toFixed(0);
                     violationsHtml += `
-                        <div class="violation-item">
-                            <strong>${v.facility}</strong> (${v.type})<br>
-                            Distance: ${v.distance} km | Required: ${v.required_distance} km<br>
-                            <span style="color: #fef08a; font-weight: 600;">⚠ ${v.shortage} km too close</span>
+                <div class="violation-item">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                        <div>
+                            <strong style="font-size: 1.1rem;">${v.facility}</strong>
+                            <div style="opacity: 0.9; margin-top: 0.25rem; text-transform: capitalize;">${v.type.replace('_', ' ')}</div>
                         </div>
-                    `;
+                        <span style="background: rgba(254, 240, 138, 0.3); color: #fef08a; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
+                            ${shortagePercent}% too close
+                        </span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 0.75rem;">
+                        <div>
+                            <div style="opacity: 0.8; font-size: 0.85rem;">Current Distance</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: #fef08a;">${v.distance} km</div>
+                        </div>
+                        <div>
+                            <div style="opacity: 0.8; font-size: 0.85rem;">Required Distance</div>
+                            <div style="font-size: 1.25rem; font-weight: 700;">${v.required_distance} km</div>
+                        </div>
+                        <div>
+                            <div style="opacity: 0.8; font-size: 0.85rem;">Shortage</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: #fca5a5;">${v.shortage} km</div>
+                        </div>
+                    </div>
+                </div>
+            `;
                 });
+
+                violationsHtml += `
+            <div style="background: rgba(255, 255, 255, 0.1); padding: 1.25rem; border-radius: 12px; margin-top: 1.5rem; border: 2px solid rgba(255, 255, 255, 0.2);">
+                <strong style="display: block; margin-bottom: 0.5rem; font-size: 1.05rem;">📋 Recommendations:</strong>
+                <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 1.8;">
+                    <li>Choose an alternative location that meets minimum distance requirements</li>
+                    <li>Consult with local authorities for site-specific regulations</li>
+                    <li>Consider buffer zones and safety margins in your planning</li>
+                </ul>
+            </div>
+        `;
+
                 violationsDiv.innerHTML = violationsHtml;
+            } else if (data.restriction_details && data.restriction_details.nearby_facilities) {
+                // Show nearby facilities even if no violations
+                let facilitiesHtml = '<h3 style="margin-top: 1.5rem; margin-bottom: 1rem;">📍 Nearby Facilities:</h3>';
+                facilitiesHtml += '<div style="display: grid; gap: 0.75rem;">';
+
+                data.restriction_details.nearby_facilities.slice(0, 5).forEach(facility => {
+                    const statusColor = facility.is_violation ? '#fca5a5' : '#86efac';
+                    const statusIcon = facility.is_violation ? '⚠️' : '✅';
+
+                    facilitiesHtml += `
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 1rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${facility.name}</strong>
+                        <div style="opacity: 0.9; font-size: 0.9rem; margin-top: 0.25rem;">${facility.type.replace('_', ' ')}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 1.1rem; font-weight: 700; color: ${statusColor};">${statusIcon} ${facility.distance_km} km</div>
+                        <div style="opacity: 0.8; font-size: 0.85rem;">Required: ${facility.safe_distance_km} km</div>
+                    </div>
+                </div>
+            `;
+                });
+
+                facilitiesHtml += '</div>';
+                violationsDiv.innerHTML = facilitiesHtml;
             }
 
             warningDiv.classList.add('show');
             warningDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        // Replace the metadata section in displayResults function with this:
+
         function displayResults(data) {
-            // Metadata
-            const metadataHtml = `
-                <div class="metadata-item">
-                    <div class="metadata-icon">📍</div>
-                    <div class="metadata-text">
-                        <div class="metadata-label">Centroid</div>
-                        <div class="metadata-value">${data.metadata.centroid[0].toFixed(4)}, ${data.metadata.centroid[1].toFixed(4)}</div>
-                    </div>
+            // Metadata with Area Information
+            let metadataHtml = '';
+
+            // Add area information if available
+            if (data.area) {
+                metadataHtml += `
+            <div class="metadata-item">
+                <div class="metadata-icon">📏</div>
+                <div class="metadata-text">
+                    <div class="metadata-label">Site Area</div>
+                    <div class="metadata-value">${data.area.hectares.toFixed(2)} ha (${data.area.acres.toFixed(2)} acres)</div>
                 </div>
-                <div class="metadata-item">
-                    <div class="metadata-icon">🌤️</div>
-                    <div class="metadata-text">
-                        <div class="metadata-label">Weather Source</div>
-                        <div class="metadata-value">${data.metadata.weather_source}</div>
-                    </div>
-                </div>
-                <div class="metadata-item">
-                    <div class="metadata-icon">🗺️</div>
-                    <div class="metadata-text">
-                        <div class="metadata-label">Infrastructure Elements</div>
-                        <div class="metadata-value">${data.metadata.osm_elements}</div>
-                    </div>
-                </div>
-            `;
+            </div>
+        `;
+            }
+
+            metadataHtml += `
+        <div class="metadata-item">
+            <div class="metadata-icon">📍</div>
+            <div class="metadata-text">
+                <div class="metadata-label">Centroid</div>
+                <div class="metadata-value">${data.metadata.centroid[0].toFixed(4)}°N, ${data.metadata.centroid[1].toFixed(4)}°E</div>
+            </div>
+        </div>
+        <div class="metadata-item">
+            <div class="metadata-icon">🌤️</div>
+            <div class="metadata-text">
+                <div class="metadata-label">Weather Source</div>
+                <div class="metadata-value">${data.metadata.weather_source}</div>
+            </div>
+        </div>
+        <div class="metadata-item">
+            <div class="metadata-icon">🗺️</div>
+            <div class="metadata-text">
+                <div class="metadata-label">Infrastructure Elements</div>
+                <div class="metadata-value">${data.metadata.osm_elements}</div>
+            </div>
+        </div>
+    `;
             document.getElementById('metadata').innerHTML = metadataHtml;
 
             // Infrastructure Analysis
@@ -1228,15 +1311,24 @@
                 const score = infra.connectivity_score || 0;
 
                 let scoreColor = '#ef4444';
-                if (score >= 75) scoreColor = '#10b981';
-                else if (score >= 50) scoreColor = '#f59e0b';
+                let scoreLabel = 'Poor';
+                if (score >= 75) {
+                    scoreColor = '#10b981';
+                    scoreLabel = 'Excellent';
+                } else if (score >= 50) {
+                    scoreColor = '#f59e0b';
+                    scoreLabel = 'Good';
+                } else if (score >= 30) {
+                    scoreColor = '#fb923c';
+                    scoreLabel = 'Fair';
+                }
 
                 document.getElementById('connectivityScore').innerHTML = `
-                    <div class="connectivity-score" style="background: linear-gradient(135deg, ${scoreColor} 0%, ${scoreColor}dd 100%);">
-                        <h3>${score}/100</h3>
-                        <p>Connectivity Score</p>
-                    </div>
-                `;
+            <div class="connectivity-score" style="background: linear-gradient(135deg, ${scoreColor} 0%, ${scoreColor}dd 100%);">
+                <h3>${score}/100</h3>
+                <p>Connectivity Score • ${scoreLabel}</p>
+            </div>
+        `;
 
                 let infraHtml = '';
                 const infraItems = [
@@ -1250,25 +1342,35 @@
                 infraItems.forEach(item => {
                     const itemData = infra[item.key];
                     if (itemData && itemData.distance_km) {
+                        // Determine distance color
+                        let distColor = 'var(--gray-900)';
+                        if (itemData.distance_km < 5) distColor = 'var(--success)';
+                        else if (itemData.distance_km < 20) distColor = 'var(--warning)';
+                        else distColor = 'var(--danger)';
+
                         infraHtml += `
-                            <div class="infra-item">
-                                <h4>${item.icon} ${item.label}</h4>
-                                <p><strong>Distance:</strong> ${itemData.distance_km} km</p>
-                                <p><strong>Nearest:</strong> ${itemData.nearest || 'N/A'}</p>
-                                <p><strong>Count:</strong> ${itemData.count || 0}</p>
-                            </div>
-                        `;
+                    <div class="infra-item">
+                        <h4>${item.icon} ${item.label}</h4>
+                        <p><strong>Distance:</strong> <span style="color: ${distColor}; font-weight: 700;">${itemData.distance_km} km</span></p>
+                        <p><strong>Nearest:</strong> ${itemData.nearest || 'N/A'}</p>
+                        ${itemData.count ? `<p><strong>Found:</strong> ${itemData.count} nearby</p>` : ''}
+                    </div>
+                `;
                     }
                 });
 
-                document.getElementById('infraDetails').innerHTML = infraHtml || '<p style="color: var(--gray-600);">No infrastructure data available</p>';
+                if (infraHtml) {
+                    document.getElementById('infraDetails').innerHTML = infraHtml;
+                } else {
+                    document.getElementById('infraDetails').innerHTML = '<p style="color: var(--gray-600); text-align: center; padding: 2rem;">No infrastructure data available within search radius</p>';
+                }
             }
 
             // Solar Results
             const solarSection = document.getElementById('solarSection');
             if (data.solar) {
                 solarSection.style.display = 'block';
-                document.getElementById('solarResults').innerHTML = generateResultHtml(data.solar);
+                document.getElementById('solarResults').innerHTML = generateResultHtml(data.solar, 'solar');
             } else {
                 solarSection.style.display = 'none';
             }
@@ -1277,7 +1379,7 @@
             const windSection = document.getElementById('windSection');
             if (data.wind) {
                 windSection.style.display = 'block';
-                document.getElementById('windResults').innerHTML = generateResultHtml(data.wind);
+                document.getElementById('windResults').innerHTML = generateResultHtml(data.wind, 'wind');
             } else {
                 windSection.style.display = 'none';
             }
@@ -1286,35 +1388,200 @@
             document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
-        function generateResultHtml(result) {
+        function generateResultHtml(result, energyType) {
             const scoreClass = `score-${result.category.toLowerCase()}`;
-            const feasibleClass = result.feasible === 'Yes' ? 'feasible-yes' : 'feasible-no';
+            const isWind = energyType === 'wind';
 
             let html = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                    <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
-                        <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Feasibility</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: ${result.feasible === 'Yes' ? 'var(--success)' : 'var(--danger)'};">${result.feasible}</div>
+        <!-- Feasibility Overview -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
+                <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Feasibility</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: ${result.feasible === 'Yes' ? 'var(--success)' : 'var(--danger)'};">${result.feasible}</div>
+            </div>
+            <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
+                <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Score</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900);">${result.score}%</div>
+            </div>
+            <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
+                <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Category</div>
+                <div><span class="score-badge ${scoreClass}">${result.category}</span></div>
+            </div>
+        </div>
+    `;
+
+            // Installation Details
+            if (result.installation) {
+                const inst = result.installation;
+                html += `
+            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 1.5rem; border-radius: 16px; margin-bottom: 1.5rem;">
+                <h4 style="color: var(--primary); margin-bottom: 1rem; font-size: 1.1rem; font-weight: 700;">
+                    ${isWind ? '🌀 Wind Farm' : '☀️ Solar Plant'} Installation Details
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        `;
+
+                if (isWind) {
+                    html += `
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">TURBINES</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${inst.num_turbines}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">${inst.turbine_capacity_mw} MW each</div>
                     </div>
-                    <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
-                        <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Score</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900);">${result.score}%</div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">TOTAL CAPACITY</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${inst.total_capacity_mw} MW</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">${inst.total_capacity_kw.toLocaleString()} kW</div>
                     </div>
-                    <div style="background: var(--gray-50); padding: 1rem; border-radius: 12px; text-align: center;">
-                        <div style="color: var(--gray-600); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">Category</div>
-                        <div><span class="score-badge ${scoreClass}">${result.category}</span></div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">AVG WIND SPEED</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${inst.avg_wind_speed} m/s</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">Capacity: ${inst.capacity_factor}%</div>
+                    </div>
+            `;
+                } else {
+                    html += `
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">SOLAR PANELS</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${inst.num_panels.toLocaleString()}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">400W panels</div>
+                    </div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">TOTAL CAPACITY</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${inst.total_capacity_mw} MW</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">${inst.total_capacity_kw.toLocaleString()} kW</div>
+                    </div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">USABLE AREA</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${(inst.usable_area_m2 / 10000).toFixed(2)}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">hectares</div>
+                    </div>
+            `;
+                }
+
+                html += `
+                </div>
+            </div>
+        `;
+            }
+
+            // Energy Generation
+            if (result.generation) {
+                const gen = result.generation;
+                html += `
+            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 1.5rem; border-radius: 16px; margin-bottom: 1.5rem;">
+                <h4 style="color: var(--success); margin-bottom: 1rem; font-size: 1.1rem; font-weight: 700;">⚡ Energy Generation Potential</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">ANNUAL GENERATION</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${gen.annual_mwh.toLocaleString()}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">MWh/year</div>
+                    </div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">DAILY AVERAGE</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${gen.daily_avg_kwh.toLocaleString()}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">kWh/day</div>
                     </div>
                 </div>
-            `;
+            </div>
+        `;
+            }
 
-            if (Object.keys(result.suggestions).length > 0) {
-                html += '<div class="suggestions"><h4>💡 Improvement Suggestions</h4><ul>';
-                for (const [param, suggestion] of Object.entries(result.suggestions)) {
-                    html += `<li><strong>${param}:</strong> ${suggestion}</li>`;
-                }
-                html += '</ul></div>';
+            // Cost Analysis
+            if (result.cost) {
+                const cost = result.cost;
+                html += `
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 1.5rem; border-radius: 16px; margin-bottom: 1.5rem;">
+                <h4 style="color: #92400e; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 700;">💰 Cost Analysis</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">INSTALLATION COST</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #92400e;">₹${cost.installation_crore.toFixed(2)}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">Crore</div>
+                    </div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">ANNUAL MAINTENANCE</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #92400e;">₹${cost.annual_maintenance_lakh.toFixed(2)}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">Lakh/year</div>
+                    </div>
+                </div>
+            </div>
+        `;
+            }
+
+            // Environmental Impact
+            if (result.environmental_impact) {
+                const env = result.environmental_impact;
+                html += `
+            <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); padding: 1.5rem; border-radius: 16px; margin-bottom: 1.5rem; border: 2px solid #10b981;">
+                <h4 style="color: var(--success); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                    🌍 Environmental Impact <span style="font-size: 0.75rem; background: var(--success); color: white; padding: 0.25rem 0.5rem; border-radius: 8px;">vs Coal Power</span>
+                </h4>
+                <p style="color: var(--gray-600); font-size: 0.9rem; margin-bottom: 1rem;">This ${isWind ? 'wind farm' : 'solar plant'} can replace coal-based electricity and provide these environmental benefits:</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                    <div style="background: white; padding: 1rem; border-radius: 12px; border-left: 4px solid #10b981;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">💨 CO₂ AVOIDED (YEARLY)</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${env.co2_reduction_yearly_tons.toLocaleString()}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">tons/year</div>
+                    </div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px; border-left: 4px solid #3b82f6;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">⛏️ COAL SAVED (YEARLY)</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;">${env.coal_saved_yearly_tons.toLocaleString()}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">tons/year</div>
+                    </div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px; border-left: 4px solid #8b5cf6;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">🌳 EQUIVALENT TREES</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;">${env.equivalent_trees.toLocaleString()}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">trees planted</div>
+                    </div>
+                    <div style="background: white; padding: 1rem; border-radius: 12px; border-left: 4px solid #f59e0b;">
+                        <div style="color: var(--gray-600); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem;">🏭 POLLUTION REDUCED</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #f59e0b;">${env.pollution_reduction_yearly_kg.toLocaleString()}</div>
+                        <div style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.25rem;">kg/year</div>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 1rem; border-radius: 12px; border: 2px dashed var(--success);">
+                    <div style="font-weight: 600; color: var(--gray-900); margin-bottom: 0.5rem;">📊 25-Year Lifetime Impact:</div>
+                    <div style="color: var(--gray-700); font-size: 0.9rem;">
+                        • <strong>${env.co2_reduction_25years_tons.toLocaleString()} tons</strong> of CO₂ emissions prevented<br>
+                        • <strong>${(env.coal_saved_yearly_tons * 25).toLocaleString()} tons</strong> of coal dependency reduced<br>
+                        • Equivalent to planting <strong>${(env.equivalent_trees * 25).toLocaleString()} trees</strong>
+                    </div>
+                </div>
+            </div>
+        `;
+            }
+
+            // Site Conditions (Simple Suggestions)
+            if (result.simple_suggestions && result.simple_suggestions.length > 0) {
+                html += `
+            <div class="suggestions">
+                <h4>📋 Site Conditions Assessment</h4>
+                <p style="color: var(--gray-600); font-size: 0.9rem; margin-bottom: 1rem;">The following conditions may affect ${isWind ? 'wind' : 'solar'} energy generation:</p>
+                <ul style="list-style: none; padding: 0;">
+        `;
+
+                result.simple_suggestions.forEach(suggestion => {
+                    html += `<li style="padding: 0.75rem; background: white; border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: start; gap: 0.75rem;">
+                <span style="color: var(--warning); font-size: 1.2rem;">⚠️</span>
+                <span style="color: var(--gray-700);">${suggestion}</span>
+            </li>`;
+                });
+
+                html += `
+                </ul>
+            </div>
+        `;
             } else {
-                html += '<div class="suggestions"><p style="color: var(--success); font-weight: 600; text-align: center;">✅ Site meets all optimal conditions!</p></div>';
+                html += `
+            <div class="suggestions">
+                <p style="color: var(--success); font-weight: 600; text-align: center; font-size: 1.05rem;">
+                    ✅ All site conditions are within optimal ranges for ${isWind ? 'wind' : 'solar'} energy generation!
+                </p>
+            </div>
+        `;
             }
 
             return html;
@@ -1327,7 +1594,7 @@
             }
 
             try {
-                const response = await fetch('/generate-report', {
+                const response = await fetch('/download-report', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

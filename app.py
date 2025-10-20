@@ -14,6 +14,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 from io import BytesIO
 import secrets
+import math
+from shapely.geometry import Polygon
+from history_db import history_db
 
 # Import the DataExtractor from analyzer.py
 sys.path.insert(0, os.path.dirname(__file__))
@@ -22,6 +25,8 @@ from auth import (
     register_user, login_user, logout_user, 
     validate_session, login_required, get_user_by_id
 )
+# Import wind analysis function from wind.py
+from wind import wind_suitability_score
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)  # Generate secure secret key
@@ -109,159 +114,425 @@ def analyze_solar_site_api(site_data):
 
 def analyze_wind_site_api(site_data):
     """
-    Analyze wind site with quarter-wise evaluation.
+    Analyze wind site using the actual wind.py model and logic
     Returns:
         label: "Yes" / "No"
         suitability_percent: 0-100
-        suggestions: dict of parameter adjustments per quarter
+        suggestions: dict of parameter adjustments
     """
-    if wind_rf is None:
-        return "Unknown", 0, {"error": "Model not loaded"}
+    try:
+        # Call the actual wind_suitability_score from wind.py
+        label, suitability_percent, suggestions = wind_suitability_score(site_data)
+        
+        print(f"🌬️ Wind Analysis Result: {label}, Score: {suitability_percent}%")
+        
+        return label, suitability_percent, suggestions
+        
+    except Exception as e:
+        print(f"❌ Error in wind analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return "Unknown", 0, {"error": str(e)}
 
-    df_site = pd.DataFrame([site_data])
 
-    # Ensure all expected features exist
-    for col in wind_features:
-        if col not in df_site.columns:
-            df_site[col] = 0
-    df_site = df_site[wind_features]
+def calculate_polygon_area(coordinates):
+    """Calculate area of polygon in square meters using Shapely"""
+    try:
+        # Convert to (lon, lat) format for Shapely
+        coords = [(coord['lng'], coord['lat']) for coord in coordinates]
+        polygon = Polygon(coords)
+        
+        # Get area in square degrees
+        area_degrees = polygon.area
+        
+        # Convert to square meters (approximate)
+        # At equator: 1 degree ≈ 111km
+        # This is approximate, for precise calculation use pyproj
+        lat_avg = sum([c['lat'] for c in coordinates]) / len(coordinates)
+        meters_per_degree_lat = 111000
+        meters_per_degree_lon = 111000 * math.cos(math.radians(lat_avg))
+        
+        area_m2 = area_degrees * meters_per_degree_lat * meters_per_degree_lon
+        return area_m2
+    except Exception as e:
+        print(f"Error calculating area: {e}")
+        return 0
 
-    # Predict using model (yearly data only)
-    prediction = wind_rf.predict(df_site)[0]
-    label = "Yes" if prediction == 1 else "No"
 
-    # Define thresholds
-    thresholds = {
-        "WindSpeed": 4,
-        "WindGustSpeed": 50,
-        "AirTemperature": (-30, 40),
-        "AirPressure": (950, 1050),
-        "RelativeHumidity": 90,
-        "Precipitation": 2000,
-        "Elevation": 1500,
-        "Slope": 15,
-        "TurbulenceIntensity": 20
+def calculate_solar_impact_and_cost(area_m2, suitability_score):
+    """
+    Calculate solar panel installation capacity, cost, and environmental impact
+    
+    Args:
+        area_m2: Area in square meters
+        suitability_score: 0-100 score
+    
+    Returns:
+        dict with installation details, costs, and environmental impact
+    """
+    # Constants
+    PANEL_AREA = 2.0  # m² per panel (typical 400W panel)
+    PANEL_CAPACITY = 0.4  # kW per panel
+    USABLE_AREA_RATIO = 0.6  # 60% of area usable (spacing, access roads, etc.)
+    INSTALLATION_COST_PER_KW = 40000  # ₹40,000 per kW (India average)
+    MAINTENANCE_COST_YEARLY = 0.02  # 2% of installation cost per year
+    CAPACITY_FACTOR = 0.19  # 19% average for India
+    COAL_CO2_PER_KWH = 0.85  # kg CO2 per kWh from coal
+    COAL_POLLUTION_PER_KWH = 0.02  # kg pollutants per kWh
+    
+    # Adjust capacity factor based on suitability
+    adjusted_capacity_factor = CAPACITY_FACTOR * (suitability_score / 100)
+    
+    # Calculate installation capacity
+    usable_area = area_m2 * USABLE_AREA_RATIO
+    num_panels = int(usable_area / PANEL_AREA)
+    total_capacity_kw = num_panels * PANEL_CAPACITY
+    total_capacity_mw = total_capacity_kw / 1000
+    
+    # Calculate energy generation
+    hours_per_year = 365 * 24
+    annual_generation_kwh = total_capacity_kw * adjusted_capacity_factor * hours_per_year
+    annual_generation_mwh = annual_generation_kwh / 1000
+    
+    # Calculate costs
+    installation_cost = total_capacity_kw * INSTALLATION_COST_PER_KW
+    annual_maintenance = installation_cost * MAINTENANCE_COST_YEARLY
+    
+    # Calculate environmental impact (compared to coal)
+    co2_reduction_yearly = annual_generation_kwh * COAL_CO2_PER_KWH  # kg
+    co2_reduction_yearly_tons = co2_reduction_yearly / 1000
+    pollution_reduction_yearly = annual_generation_kwh * COAL_POLLUTION_PER_KWH  # kg
+    
+    # Equivalent trees (1 tree absorbs ~20kg CO2/year)
+    equivalent_trees = int(co2_reduction_yearly / 20)
+    
+    # Coal dependency reduction (assuming 0.5 kg coal per kWh)
+    coal_saved_yearly_kg = annual_generation_kwh * 0.5
+    coal_saved_yearly_tons = coal_saved_yearly_kg / 1000
+    
+    return {
+        "installation": {
+            "area_m2": round(area_m2, 2),
+            "usable_area_m2": round(usable_area, 2),
+            "num_panels": num_panels,
+            "total_capacity_kw": round(total_capacity_kw, 2),
+            "total_capacity_mw": round(total_capacity_mw, 2),
+            "capacity_factor": round(adjusted_capacity_factor * 100, 2)
+        },
+        "generation": {
+            "annual_kwh": round(annual_generation_kwh, 2),
+            "annual_mwh": round(annual_generation_mwh, 2),
+            "daily_avg_kwh": round(annual_generation_kwh / 365, 2)
+        },
+        "cost": {
+            "installation_inr": round(installation_cost, 2),
+            "installation_crore": round(installation_cost / 10000000, 2),
+            "annual_maintenance_inr": round(annual_maintenance, 2),
+            "annual_maintenance_lakh": round(annual_maintenance / 100000, 2)
+        },
+        "environmental_impact": {
+            "co2_reduction_yearly_tons": round(co2_reduction_yearly_tons, 2),
+            "co2_reduction_25years_tons": round(co2_reduction_yearly_tons * 25, 2),
+            "equivalent_trees": equivalent_trees,
+            "pollution_reduction_yearly_kg": round(pollution_reduction_yearly, 2),
+            "coal_saved_yearly_tons": round(coal_saved_yearly_tons, 2)
+        }
     }
 
-    score = 0
-    suggestions = {}
 
-    # Evaluate each quarter + yearly
-    for param, threshold in thresholds.items():
-        matching_cols = [c for c in df_site.columns if param in c]
-        for col in matching_cols:
-            value = float(df_site[col].iloc[0])
+def calculate_wind_impact_and_cost(area_m2, suitability_score, avg_wind_speed):
+    """
+    Calculate wind turbine installation capacity, cost, and environmental impact
+    
+    Args:
+        area_m2: Area in square meters
+        suitability_score: 0-100 score
+        avg_wind_speed: Average wind speed in m/s
+    
+    Returns:
+        dict with installation details, costs, and environmental impact
+    """
+    # Constants
+    TURBINE_SPACING = 250000  # m² per turbine (500m x 500m spacing)
+    TURBINE_CAPACITY = 2500  # kW per turbine (2.5 MW)
+    INSTALLATION_COST_PER_KW = 60000  # ₹60,000 per kW (India average)
+    MAINTENANCE_COST_YEARLY = 0.03  # 3% of installation cost per year
+    BASE_CAPACITY_FACTOR = 0.25  # 25% average for India
+    COAL_CO2_PER_KWH = 0.85  # kg CO2 per kWh from coal
+    COAL_POLLUTION_PER_KWH = 0.02  # kg pollutants per kWh
+    
+    # Adjust capacity factor based on wind speed and suitability
+    wind_factor = min(avg_wind_speed / 6.5, 1.5)  # Optimal at 6.5 m/s
+    adjusted_capacity_factor = BASE_CAPACITY_FACTOR * wind_factor * (suitability_score / 100)
+    
+    # Calculate installation capacity
+    num_turbines = max(1, int(area_m2 / TURBINE_SPACING))
+    total_capacity_kw = num_turbines * TURBINE_CAPACITY
+    total_capacity_mw = total_capacity_kw / 1000
+    
+    # Calculate energy generation
+    hours_per_year = 365 * 24
+    annual_generation_kwh = total_capacity_kw * adjusted_capacity_factor * hours_per_year
+    annual_generation_mwh = annual_generation_kwh / 1000
+    
+    # Calculate costs
+    installation_cost = total_capacity_kw * INSTALLATION_COST_PER_KW
+    annual_maintenance = installation_cost * MAINTENANCE_COST_YEARLY
+    
+    # Calculate environmental impact
+    co2_reduction_yearly = annual_generation_kwh * COAL_CO2_PER_KWH
+    co2_reduction_yearly_tons = co2_reduction_yearly / 1000
+    pollution_reduction_yearly = annual_generation_kwh * COAL_POLLUTION_PER_KWH
+    
+    equivalent_trees = int(co2_reduction_yearly / 20)
+    
+    coal_saved_yearly_kg = annual_generation_kwh * 0.5
+    coal_saved_yearly_tons = coal_saved_yearly_kg / 1000
+    
+    return {
+        "installation": {
+            "area_m2": round(area_m2, 2),
+            "num_turbines": num_turbines,
+            "turbine_capacity_kw": TURBINE_CAPACITY,
+            "turbine_capacity_mw": TURBINE_CAPACITY / 1000,
+            "total_capacity_kw": round(total_capacity_kw, 2),
+            "total_capacity_mw": round(total_capacity_mw, 2),
+            "capacity_factor": round(adjusted_capacity_factor * 100, 2),
+            "avg_wind_speed": round(avg_wind_speed, 2)
+        },
+        "generation": {
+            "annual_kwh": round(annual_generation_kwh, 2),
+            "annual_mwh": round(annual_generation_mwh, 2),
+            "daily_avg_kwh": round(annual_generation_kwh / 365, 2)
+        },
+        "cost": {
+            "installation_inr": round(installation_cost, 2),
+            "installation_crore": round(installation_cost / 10000000, 2),
+            "annual_maintenance_inr": round(annual_maintenance, 2),
+            "annual_maintenance_lakh": round(annual_maintenance / 100000, 2)
+        },
+        "environmental_impact": {
+            "co2_reduction_yearly_tons": round(co2_reduction_yearly_tons, 2),
+            "co2_reduction_25years_tons": round(co2_reduction_yearly_tons * 25, 2),
+            "equivalent_trees": equivalent_trees,
+            "pollution_reduction_yearly_kg": round(pollution_reduction_yearly, 2),
+            "coal_saved_yearly_tons": round(coal_saved_yearly_tons, 2)
+        }
+    }
 
-            # Handle range thresholds (like AirTemperature, AirPressure)
-            if isinstance(threshold, tuple):
-                low, high = threshold
-                if low <= value <= high:
-                    score += 1
-                else:
-                    if value < low:
-                        suggestions[col] = f"Increase by {round(low - value, 2)}"
-                    else:
-                        suggestions[col] = f"Reduce by {round(value - high, 2)}"
-            else:
-                # Single-value thresholds
-                if param in ["RelativeHumidity", "Precipitation", "Slope", "Elevation", "TurbulenceIntensity"]:
-                    if value < threshold:
-                        score += 1
-                    else:
-                        suggestions[col] = f"Reduce by {round(value - threshold, 2)}"
-                else:
-                    if value >= threshold:
-                        score += 1
-                    else:
-                        suggestions[col] = f"Increase by {round(threshold - value, 2)}"
 
-    total_params = sum([len([c for c in df_site.columns if param in c]) for param in thresholds])
-    suitability_percent = round((score / total_params) * 100, 2) if total_params > 0 else 0
+def convert_wind_suggestions_to_simple_language(suggestions):
+    """
+    Convert wind technical suggestions from wind.py to simple English statements
+    Removes duplicates by grouping similar parameters
+    
+    Args:
+        suggestions: Dict of parameter suggestions from wind.py
+    
+    Returns:
+        List of unique simple English statements
+    """
+    simple_statements = []
+    seen_base_params = set()  # Track base parameters to avoid duplicates
+    
+    for param, suggestion_text in suggestions.items():
+        # Extract base parameter name (e.g., "WindSpeed" from "Q1-WindSpeed")
+        if '-' in param:
+            base_param = param.split('-', 1)[1]
+        else:
+            base_param = param
+        
+        # Skip if we've already added a suggestion for this base parameter
+        if base_param in seen_base_params:
+            continue
+        
+        seen_base_params.add(base_param)
+        
+        # The suggestion text from wind.py already contains the warning message
+        # Just clean it up and add to simple statements
+        simple_statements.append(suggestion_text)
+    
+    return simple_statements
 
-    return label, suitability_percent, suggestions
+
+def convert_suggestions_to_simple_language(suggestions, analysis_type):
+    """
+    Convert technical suggestions to simple English statements
+    
+    Args:
+        suggestions: Dict of parameter suggestions
+        analysis_type: 'solar' or 'wind'
+    
+    Returns:
+        List of simple English statements
+    """
+    if analysis_type == 'wind':
+        # Use specialized wind converter that handles wind.py output
+        return convert_wind_suggestions_to_simple_language(suggestions)
+    
+    # Solar-specific conversion
+    simple_statements = []
+    
+    # Parameter name mappings to simple language
+    param_descriptions = {
+        "GHI (kWh/m²/day)": "sunlight intensity",
+        "DNI (kWh/m²/day)": "direct sunlight",
+        "DHI (% of GHI)": "diffused sunlight ratio",
+        "Snowfall (mm/year)": "snowfall levels",
+        "Cloud cover": "cloud coverage",
+        "Sunshine duration": "daily sunshine hours",
+        "Ambient temperature": "temperature",
+        "Relative humidity": "humidity",
+        "Precipitation": "rainfall",
+    }
+    
+    for param, suggestion in suggestions.items():
+        # Get simple description
+        simple_name = param_descriptions.get(param, param.lower())
+        
+        # Determine if increase or decrease needed
+        if "Increase" in suggestion or "increase" in suggestion:
+            statement = f"The {simple_name} is lower than expected for optimal {analysis_type} energy generation."
+        elif "Reduce" in suggestion or "reduce" in suggestion:
+            statement = f"The {simple_name} is higher than ideal for {analysis_type} energy setup."
+        else:
+            statement = f"The {simple_name} needs adjustment for better {analysis_type} performance."
+        
+        simple_statements.append(statement)
+    
+    return simple_statements
 
 
 def generate_pdf_report(analysis_data):
-    """Generate detailed PDF report"""
+    """Generate detailed PDF report with environmental impact and cost analysis"""
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
     styles = getSampleStyleSheet()
     story = []
     
-    # Title
+    # Custom styles
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
-        fontSize=24,
+        fontSize=22,
         textColor=colors.HexColor('#667eea'),
-        spaceAfter=30,
-        alignment=1  # Center
+        spaceAfter=20,
+        alignment=1
     )
+    
+    heading2_style = ParagraphStyle(
+        'CustomHeading2',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor('#4a5568'),
+        spaceBefore=15,
+        spaceAfter=10
+    )
+    
+    # Title
     story.append(Paragraph("Renewable Energy Site Analysis Report", title_style))
-    story.append(Spacer(1, 0.3*inch))
+    story.append(Spacer(1, 0.2*inch))
     
     # Timestamp
-    story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+    story.append(Paragraph(
+        f"<b>Generated:</b> {datetime.now().strftime('%d %B %Y, %I:%M %p')}", 
+        styles['Normal']
+    ))
     story.append(Spacer(1, 0.3*inch))
     
     # Check if restricted
     if analysis_data.get('restricted'):
-        restriction_data = [[Paragraph("<b>⚠️ SITE RESTRICTED</b>", styles['Heading2'])]]
-        story.append(Table(restriction_data, colWidths=[6*inch]))
-        story.append(Spacer(1, 0.2*inch))
+        restriction_style = ParagraphStyle(
+            'Restriction',
+            parent=styles['Normal'],
+            fontSize=14,
+            textColor=colors.red,
+            spaceAfter=15
+        )
+        story.append(Paragraph("<b>⚠️ SITE RESTRICTED FOR RENEWABLE ENERGY PROJECT</b>", restriction_style))
+        story.append(Spacer(1, 0.15*inch))
         
         violations = analysis_data['restriction_details']['violations']
         if violations:
-            story.append(Paragraph("<b>Safety Violations:</b>", styles['Heading3']))
+            story.append(Paragraph("<b>Safety Violations Detected:</b>", styles['Heading3']))
+            story.append(Spacer(1, 0.1*inch))
             for v in violations:
                 story.append(Paragraph(
-                    f"• {v['facility']} ({v['type']}): {v['distance']} km (Required: {v['required_distance']} km)",
+                    f"• <b>{v['facility']}</b> ({v['type']}): Currently {v['distance']} km away. " +
+                    f"Minimum required distance is {v['required_distance']} km. " +
+                    f"The site is {v['shortage']} km too close.",
                     styles['Normal']
                 ))
+                story.append(Spacer(1, 0.05*inch))
         
         doc.build(story)
         buffer.seek(0)
         return buffer
     
+    # Site Area Information
+    if 'area' in analysis_data:
+        story.append(Paragraph("<b>Site Area</b>", heading2_style))
+        area_data = [
+            ['Measurement', 'Value'],
+            ['Square Meters', f"{analysis_data['area']['square_meters']:,.2f} m²"],
+            ['Hectares', f"{analysis_data['area']['hectares']:,.2f} ha"],
+            ['Acres', f"{analysis_data['area']['acres']:,.2f} acres"]
+        ]
+        area_table = Table(area_data, colWidths=[2.5*inch, 3.5*inch])
+        area_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('PADDING', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(area_table)
+        story.append(Spacer(1, 0.25*inch))
+    
     # Metadata Section
-    story.append(Paragraph("<b>Site Information</b>", styles['Heading2']))
+    story.append(Paragraph("<b>Site Location</b>", heading2_style))
     metadata = analysis_data['metadata']
     meta_data = [
-        ['Centroid', f"{metadata['centroid'][0]:.4f}, {metadata['centroid'][1]:.4f}"],
-        ['Weather Source', metadata['weather_source']],
-        ['OSM Elements', str(metadata['osm_elements'])]
+        ['Property', 'Value'],
+        ['Coordinates', f"{metadata['centroid'][0]:.4f}°N, {metadata['centroid'][1]:.4f}°E"],
+        ['Weather Data Source', metadata['weather_source']],
     ]
-    meta_table = Table(meta_data, colWidths=[2*inch, 4*inch])
+    meta_table = Table(meta_data, colWidths=[2.5*inch, 3.5*inch])
     meta_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f0f0f0')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('PADDING', (0, 0), (-1, -1), 10),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('PADDING', (0, 0), (-1, -1), 8),
     ]))
     story.append(meta_table)
     story.append(Spacer(1, 0.3*inch))
     
     # Infrastructure Analysis
     if 'infrastructure_analysis' in analysis_data:
-        story.append(Paragraph("<b>Infrastructure Connectivity</b>", styles['Heading2']))
+        story.append(Paragraph("<b>Infrastructure Connectivity</b>", heading2_style))
         infra = analysis_data['infrastructure_analysis']
         
-        story.append(Paragraph(f"<b>Connectivity Score: {infra.get('connectivity_score', 'N/A')}/100</b>", styles['Normal']))
-        story.append(Spacer(1, 0.1*inch))
+        score = infra.get('connectivity_score', 0)
+        score_color = colors.green if score >= 70 else colors.orange if score >= 40 else colors.red
         
-        infra_data = []
+        story.append(Paragraph(
+            f"<b>Connectivity Score: <font color='{score_color.hexval()}'>{score}/100</font></b>",
+            styles['Normal']
+        ))
+        story.append(Spacer(1, 0.15*inch))
+        
+        infra_data = [['Infrastructure Type', 'Nearest Distance', 'Facility Name']]
         for key, value in infra.items():
-            if isinstance(value, dict) and 'distance_km' in value:
-                if value['distance_km']:
-                    infra_data.append([
-                        key.replace('_', ' ').title(),
-                        f"{value['distance_km']} km",
-                        value.get('nearest', 'N/A')
-                    ])
+            if isinstance(value, dict) and 'distance_km' in value and value['distance_km']:
+                infra_data.append([
+                    key.replace('_', ' ').title(),
+                    f"{value['distance_km']} km",
+                    value.get('nearest', 'N/A')
+                ])
         
-        if infra_data:
-            infra_table = Table([['Infrastructure', 'Distance', 'Nearest']] + infra_data, 
-                               colWidths=[2*inch, 1.5*inch, 2.5*inch])
+        if len(infra_data) > 1:
+            infra_table = Table(infra_data, colWidths=[2*inch, 1.5*inch, 2.5*inch])
             infra_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -274,55 +545,256 @@ def generate_pdf_report(analysis_data):
     
     # Solar Analysis
     if 'solar' in analysis_data:
-        story.append(Paragraph("<b>☀️ Solar Energy Analysis</b>", styles['Heading2']))
         solar = analysis_data['solar']
         
-        solar_summary = [
-            ['Feasibility', solar['feasible']],
-            ['Suitability Score', f"{solar['score']}%"],
-            ['Category', solar['category']]
-        ]
-        solar_table = Table(solar_summary, colWidths=[2*inch, 4*inch])
-        solar_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#fff4e6')),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('PADDING', (0, 0), (-1, -1), 10),
-        ]))
-        story.append(solar_table)
+        story.append(Paragraph("☀️ <b>Solar Energy Analysis</b>", heading2_style))
+        story.append(Spacer(1, 0.1*inch))
+        
+        # Summary
+        feasible_color = colors.green if solar['feasible'] == 'Yes' else colors.red
+        story.append(Paragraph(
+            f"<b>Feasibility:</b> <font color='{feasible_color.hexval()}'>{solar['feasible']}</font> | " +
+            f"<b>Suitability Score:</b> {solar['score']}% | " +
+            f"<b>Category:</b> {solar['category']}",
+            styles['Normal']
+        ))
         story.append(Spacer(1, 0.2*inch))
         
-        if solar['suggestions']:
-            story.append(Paragraph("<b>Improvement Suggestions:</b>", styles['Heading3']))
-            for param, suggestion in solar['suggestions'].items():
-                story.append(Paragraph(f"• <b>{param}:</b> {suggestion}", styles['Normal']))
-        story.append(Spacer(1, 0.3*inch))
+        # Installation Details
+        if 'installation' in solar:
+            story.append(Paragraph("<b>Installation Capacity</b>", styles['Heading3']))
+            inst = solar['installation']
+            install_data = [
+                ['Parameter', 'Value'],
+                ['Number of Solar Panels', f"{inst['num_panels']:,}"],
+                ['Usable Area', f"{inst['usable_area_m2']:,.2f} m²"],
+                ['Total Capacity', f"{inst['total_capacity_mw']:.2f} MW ({inst['total_capacity_kw']:,.2f} kW)"],
+                ['Capacity Factor', f"{inst['capacity_factor']}%"]
+            ]
+            install_table = Table(install_data, colWidths=[2.5*inch, 3.5*inch])
+            install_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#fff4e6')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(install_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Energy Generation
+        if 'generation' in solar:
+            story.append(Paragraph("<b>Energy Generation Potential</b>", styles['Heading3']))
+            gen = solar['generation']
+            gen_data = [
+                ['Period', 'Generation'],
+                ['Annual Generation', f"{gen['annual_mwh']:,.2f} MWh ({gen['annual_kwh']:,.2f} kWh)"],
+                ['Daily Average', f"{gen['daily_avg_kwh']:,.2f} kWh"]
+            ]
+            gen_table = Table(gen_data, colWidths=[2.5*inch, 3.5*inch])
+            gen_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#fff4e6')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(gen_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Cost Analysis
+        if 'cost' in solar:
+            story.append(Paragraph("<b>Cost Analysis</b>", styles['Heading3']))
+            cost = solar['cost']
+            cost_data = [
+                ['Cost Component', 'Amount (₹)', 'Amount'],
+                ['Installation Cost', f"₹{cost['installation_inr']:,.2f}", f"₹{cost['installation_crore']:.2f} Crore"],
+                ['Annual Maintenance', f"₹{cost['annual_maintenance_inr']:,.2f}", f"₹{cost['annual_maintenance_lakh']:.2f} Lakh"]
+            ]
+            cost_table = Table(cost_data, colWidths=[2*inch, 2*inch, 2*inch])
+            cost_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8f5e9')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(cost_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Environmental Impact
+        if 'environmental_impact' in solar:
+            story.append(Paragraph("<b>Environmental Impact (vs Coal Power)</b>", styles['Heading3']))
+            env = solar['environmental_impact']
+            story.append(Paragraph(
+                f"This solar installation can replace coal-based power generation and provide significant environmental benefits:",
+                styles['Normal']
+            ))
+            story.append(Spacer(1, 0.1*inch))
+            
+            env_data = [
+                ['Impact Category', 'Annual', '25-Year Lifetime'],
+                ['CO₂ Emissions Avoided', f"{env['co2_reduction_yearly_tons']:,.2f} tons", 
+                 f"{env['co2_reduction_25years_tons']:,.2f} tons"],
+                ['Coal Dependency Reduced', f"{env['coal_saved_yearly_tons']:,.2f} tons", 
+                 f"{env['coal_saved_yearly_tons'] * 25:,.2f} tons"],
+                ['Air Pollution Reduced', f"{env['pollution_reduction_yearly_kg']:,.2f} kg", 
+                 f"{env['pollution_reduction_yearly_kg'] * 25:,.2f} kg"],
+                ['Equivalent Trees Planted', f"{env['equivalent_trees']:,} trees", 
+                 f"{env['equivalent_trees'] * 25:,} trees"]
+            ]
+            env_table = Table(env_data, colWidths=[2*inch, 2*inch, 2*inch])
+            env_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8f5e9')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(env_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Simple Suggestions
+        if solar.get('simple_suggestions'):
+            story.append(Paragraph("<b>Site Conditions Assessment</b>", styles['Heading3']))
+            story.append(Paragraph(
+                "The following site conditions may affect solar energy generation:",
+                styles['Normal']
+            ))
+            story.append(Spacer(1, 0.1*inch))
+            for suggestion in solar['simple_suggestions']:
+                story.append(Paragraph(f"• {suggestion}", styles['Normal']))
+                story.append(Spacer(1, 0.05*inch))
+        else:
+            story.append(Paragraph(
+                "✅ <b>All site conditions are within optimal ranges for solar energy generation.</b>",
+                styles['Normal']
+            ))
+        
+        story.append(PageBreak())
     
     # Wind Analysis
     if 'wind' in analysis_data:
-        story.append(Paragraph("<b>💨 Wind Energy Analysis</b>", styles['Heading2']))
         wind = analysis_data['wind']
         
-        wind_summary = [
-            ['Feasibility', wind['feasible']],
-            ['Suitability Score', f"{wind['score']}%"],
-            ['Category', wind['category']]
-        ]
-        wind_table = Table(wind_summary, colWidths=[2*inch, 4*inch])
-        wind_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e6f7ff')),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('PADDING', (0, 0), (-1, -1), 10),
-        ]))
-        story.append(wind_table)
+        story.append(Paragraph("💨 <b>Wind Energy Analysis</b>", heading2_style))
+        story.append(Spacer(1, 0.1*inch))
+        
+        # Summary
+        feasible_color = colors.green if wind['feasible'] == 'Yes' else colors.red
+        story.append(Paragraph(
+            f"<b>Feasibility:</b> <font color='{feasible_color.hexval()}'>{wind['feasible']}</font> | " +
+            f"<b>Suitability Score:</b> {wind['score']}% | " +
+            f"<b>Category:</b> {wind['category']}",
+            styles['Normal']
+        ))
         story.append(Spacer(1, 0.2*inch))
         
-        if wind['suggestions']:
-            story.append(Paragraph("<b>Improvement Suggestions:</b>", styles['Heading3']))
-            for param, suggestion in wind['suggestions'].items():
-                story.append(Paragraph(f"• <b>{param}:</b> {suggestion}", styles['Normal']))
+        # Installation Details
+        if 'installation' in wind:
+            story.append(Paragraph("<b>Installation Capacity</b>", styles['Heading3']))
+            inst = wind['installation']
+            install_data = [
+                ['Parameter', 'Value'],
+                ['Number of Wind Turbines', f"{inst['num_turbines']}"],
+                ['Turbine Capacity (each)', f"{inst['turbine_capacity_mw']} MW"],
+                ['Total Capacity', f"{inst['total_capacity_mw']:.2f} MW ({inst['total_capacity_kw']:,.2f} kW)"],
+                ['Average Wind Speed', f"{inst['avg_wind_speed']} m/s"],
+                ['Capacity Factor', f"{inst['capacity_factor']}%"]
+            ]
+            install_table = Table(install_data, colWidths=[2.5*inch, 3.5*inch])
+            install_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e6f7ff')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(install_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Energy Generation
+        if 'generation' in wind:
+            story.append(Paragraph("<b>Energy Generation Potential</b>", styles['Heading3']))
+            gen = wind['generation']
+            gen_data = [
+                ['Period', 'Generation'],
+                ['Annual Generation', f"{gen['annual_mwh']:,.2f} MWh ({gen['annual_kwh']:,.2f} kWh)"],
+                ['Daily Average', f"{gen['daily_avg_kwh']:,.2f} kWh"]
+            ]
+            gen_table = Table(gen_data, colWidths=[2.5*inch, 3.5*inch])
+            gen_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e6f7ff')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(gen_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Cost Analysis
+        if 'cost' in wind:
+            story.append(Paragraph("<b>Cost Analysis</b>", styles['Heading3']))
+            cost = wind['cost']
+            cost_data = [
+                ['Cost Component', 'Amount (₹)', 'Amount'],
+                ['Installation Cost', f"₹{cost['installation_inr']:,.2f}", f"₹{cost['installation_crore']:.2f} Crore"],
+                ['Annual Maintenance', f"₹{cost['annual_maintenance_inr']:,.2f}", f"₹{cost['annual_maintenance_lakh']:.2f} Lakh"]
+            ]
+            cost_table = Table(cost_data, colWidths=[2*inch, 2*inch, 2*inch])
+            cost_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8f5e9')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(cost_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Environmental Impact
+        if 'environmental_impact' in wind:
+            story.append(Paragraph("<b>Environmental Impact (vs Coal Power)</b>", styles['Heading3']))
+            env = wind['environmental_impact']
+            story.append(Paragraph(
+                f"This wind farm can replace coal-based power generation and provide significant environmental benefits:",
+                styles['Normal']
+            ))
+            story.append(Spacer(1, 0.1*inch))
+            
+            env_data = [
+                ['Impact Category', 'Annual', '25-Year Lifetime'],
+                ['CO₂ Emissions Avoided', f"{env['co2_reduction_yearly_tons']:,.2f} tons", 
+                 f"{env['co2_reduction_25years_tons']:,.2f} tons"],
+                ['Coal Dependency Reduced', f"{env['coal_saved_yearly_tons']:,.2f} tons", 
+                 f"{env['coal_saved_yearly_tons'] * 25:,.2f} tons"],
+                ['Air Pollution Reduced', f"{env['pollution_reduction_yearly_kg']:,.2f} kg", 
+                 f"{env['pollution_reduction_yearly_kg'] * 25:,.2f} kg"],
+                ['Equivalent Trees Planted', f"{env['equivalent_trees']:,} trees", 
+                 f"{env['equivalent_trees'] * 25:,} trees"]
+            ]
+            env_table = Table(env_data, colWidths=[2*inch, 2*inch, 2*inch])
+            env_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8f5e9')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(env_table)
+            story.append(Spacer(1, 0.2*inch))
+        
+        # Simple Suggestions
+        if wind.get('simple_suggestions'):
+            story.append(Paragraph("<b>Site Conditions Assessment</b>", styles['Heading3']))
+            story.append(Paragraph(
+                "The following site conditions may affect wind energy generation:",
+                styles['Normal']
+            ))
+            story.append(Spacer(1, 0.1*inch))
+            for suggestion in wind['simple_suggestions']:
+                story.append(Paragraph(f"• {suggestion}", styles['Normal']))
+                story.append(Spacer(1, 0.05*inch))
+        else:
+            story.append(Paragraph(
+                "✅ <b>All site conditions are within optimal ranges for wind energy generation.</b>",
+                styles['Normal']
+            ))
     
+    # Build PDF
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -477,13 +949,13 @@ def get_current_user():
 @app.route('/analyze', methods=['POST'])
 @login_required
 def analyze():
-    """Main endpoint for site analysis (protected route)"""
+    """Main endpoint for site analysis with environmental impact and cost (protected route)"""
     try:
         data = request.get_json()
         
         # Extract coordinates and analysis type
         coordinates = data.get('coordinates', [])
-        analysis_type = data.get('analysis_type', 'both')  # 'solar', 'wind', or 'both'
+        analysis_type = data.get('analysis_type', 'both')
         
         if not coordinates or len(coordinates) < 3:
             return jsonify({
@@ -491,11 +963,17 @@ def analyze():
                 'error': 'Please provide at least 3 coordinates for polygon'
             }), 400
         
+        # Calculate area
+        area_m2 = calculate_polygon_area(coordinates)
+        area_hectares = area_m2 / 10000
+        area_acres = area_m2 / 4047
+        
         # Convert to required format [(lat, lon), ...]
         polygon_coords = [(coord['lat'], coord['lng']) for coord in coordinates]
         
         # Extract data using analyzer
         print(f"📍 Analyzing polygon with {len(polygon_coords)} points...")
+        print(f"   Area: {area_hectares:.2f} hectares ({area_acres:.2f} acres)")
         print(f"   Analysis Type: {analysis_type}")
         print(f"   User: {request.current_user['email']}")
         
@@ -529,6 +1007,11 @@ def analyze():
             'success': True,
             'restricted': False,
             'analysis_type': analysis_type,
+            'area': {
+                'square_meters': round(area_m2, 2),
+                'hectares': round(area_hectares, 2),
+                'acres': round(area_acres, 2)
+            },
             'metadata': {
                 'centroid': extracted_data['metadata']['centroid'],
                 'weather_source': extracted_data['metadata']['source'],
@@ -543,24 +1026,51 @@ def analyze():
             solar_label, solar_score, solar_suggestions = analyze_solar_site_api(
                 extracted_data['solar_site']
             )
+            
+            # Convert suggestions to simple language
+            simple_suggestions = convert_suggestions_to_simple_language(solar_suggestions, 'solar')
+            
+            # Calculate environmental impact and cost
+            solar_impact = calculate_solar_impact_and_cost(area_m2, solar_score)
+            
             response['solar'] = {
                 'feasible': solar_label,
                 'score': solar_score,
                 'category': get_category(solar_score),
                 'suggestions': solar_suggestions,
-                'raw_data': extracted_data['solar_site']
+                'simple_suggestions': simple_suggestions,
+                'raw_data': extracted_data['solar_site'],
+                'installation': solar_impact['installation'],
+                'generation': solar_impact['generation'],
+                'cost': solar_impact['cost'],
+                'environmental_impact': solar_impact['environmental_impact']
             }
         
         if analysis_type in ['wind', 'both']:
             wind_label, wind_score, wind_suggestions = analyze_wind_site_api(
                 extracted_data['wind_site']
             )
+            
+            # Convert suggestions to simple language (handles deduplication)
+            simple_suggestions = convert_suggestions_to_simple_language(wind_suggestions, 'wind')
+            
+            # Get average wind speed from the data
+            avg_wind_speed = extracted_data['wind_site'].get('Yearly-WindSpeed', 5.0)
+            
+            # Calculate environmental impact and cost
+            wind_impact = calculate_wind_impact_and_cost(area_m2, wind_score, avg_wind_speed)
+            
             response['wind'] = {
                 'feasible': wind_label,
                 'score': wind_score,
                 'category': get_category(wind_score),
                 'suggestions': wind_suggestions,
-                'raw_data': extracted_data['wind_site']
+                'simple_suggestions': simple_suggestions,
+                'raw_data': extracted_data['wind_site'],
+                'installation': wind_impact['installation'],
+                'generation': wind_impact['generation'],
+                'cost': wind_impact['cost'],
+                'environmental_impact': wind_impact['environmental_impact']
             }
         
         return jsonify(response)
@@ -575,23 +1085,32 @@ def analyze():
         }), 500
 
 
-@app.route('/generate-report', methods=['POST'])
+@app.route('/download-report', methods=['POST'])
 @login_required
-def generate_report():
-    """Generate and download PDF report (protected route)"""
+def download_report():
+    """Generate and download PDF report"""
     try:
         data = request.get_json()
+        
+        # Generate PDF
         pdf_buffer = generate_pdf_report(data)
         
+        # Send file
         return send_file(
             pdf_buffer,
             mimetype='application/pdf',
             as_attachment=True,
             download_name=f'renewable_energy_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
         )
+    
     except Exception as e:
-        print(f"❌ PDF Generation Error: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"❌ Error generating PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @app.route('/health', methods=['GET'])

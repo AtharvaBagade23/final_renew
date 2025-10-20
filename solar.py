@@ -179,13 +179,3 @@ def analyze_solar_site(site_data):
         print("\n✅ This site meets all optimal conditions for solar plant setup.")
     
     return label, score, suggestions
-
-if __name__ == "__main__":
-    # Example site for standalone testing
-    sample_site = {
-        "GHI (kWh/m²/day)": 19.12,
-        "DNI (kWh/m²/day)": 4.460172807826036,
-        "DHI (% of GHI)": 36.50649688880027,
-        # ... (rest of the sample data)
-    }
-    analyze_solar_site(sample_site)
