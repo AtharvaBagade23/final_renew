@@ -16,7 +16,6 @@ from io import BytesIO
 import secrets
 import math
 from shapely.geometry import Polygon
-from history_db import history_db
 
 # Import the DataExtractor from analyzer.py
 sys.path.insert(0, os.path.dirname(__file__))
