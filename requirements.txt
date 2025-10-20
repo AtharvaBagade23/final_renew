@@ -8,3 +8,4 @@ matplotlib
 reportlab
 gunicorn
 requests
+shapely
