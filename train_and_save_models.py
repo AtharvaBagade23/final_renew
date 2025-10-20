@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 import joblib
 
 # Solar Model
-solar_df = pd.read_csv("Solar_Sites_Dataset_India.csv")
+solar_df = pd.read_csv("./Datasets/Solar_Sites_Dataset_India.csv")
 solar_label_col = "Label (Yes/No)"
 solar_df[solar_label_col] = solar_df[solar_label_col].map({"Yes": 1, "No": 0})
 solar_X = solar_df.drop(solar_label_col, axis=1)
@@ -20,7 +20,7 @@ joblib.dump((solar_rf, list(solar_X.columns)), "solar_model.pkl")
 print("Saved solar_model.pkl")
 
 # Wind Model
-wind_df = pd.read_csv("Wind_Sites_Dataset_India.csv")
+wind_df = pd.read_csv("./Datasets/Wind_Sites_Dataset_India.csv")
 wind_label_col = "Label"
 wind_df[wind_label_col] = wind_df[wind_label_col].map({"Yes": 1, "No": 0})
 wind_X = wind_df.drop(wind_label_col, axis=1)

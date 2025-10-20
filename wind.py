@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # -------------------------
 # 1. Load Dataset
 # -------------------------
-DATA_PATH = "Wind_Sites_Dataset_India.csv"  # Path to the dataset
+DATA_PATH = "./Datasets/Wind_Sites_Dataset_India.csv"  # Path to the dataset
 df = pd.read_csv(DATA_PATH)
 
 # Encode Label

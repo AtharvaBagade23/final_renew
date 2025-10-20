@@ -605,8 +605,8 @@ def generate_pdf_report(analysis_data):
             cost = solar['cost']
             cost_data = [
                 ['Cost Component', 'Amount (Rs)', 'Amount'],
-                ['Installation Cost', f"Rs{cost['installation_inr']:,.2f}", f"Rs{cost['installation_crore']:.2f} Crore"],
-                ['Annual Maintenance', f"Rs{cost['annual_maintenance_inr']:,.2f}", f"Rs{cost['annual_maintenance_lakh']:.2f} Lakh"]
+                ['Installation Cost', f"Rs.{cost['installation_inr']:,.2f}", f"Rs.{cost['installation_crore']:.2f} Crore"],
+                ['Annual Maintenance', f"Rs.{cost['annual_maintenance_inr']:,.2f}", f"Rs.{cost['annual_maintenance_lakh']:.2f} Lakh"]
             ]
             cost_table = Table(cost_data, colWidths=[2*inch, 2*inch, 2*inch])
             cost_table.setStyle(TableStyle([
@@ -732,8 +732,8 @@ def generate_pdf_report(analysis_data):
             cost = wind['cost']
             cost_data = [
                 ['Cost Component', 'Amount (Rs)', 'Amount'],
-                ['Installation Cost', f"Rs{cost['installation_inr']:,.2f}", f"Rs{cost['installation_crore']:.2f} Crore"],
-                ['Annual Maintenance', f"Rs{cost['annual_maintenance_inr']:,.2f}", f"Rs{cost['annual_maintenance_lakh']:.2f} Lakh"]
+                ['Installation Cost', f"Rs.{cost['installation_inr']:,.2f}", f"Rs.{cost['installation_crore']:.2f} Crore"],
+                ['Annual Maintenance', f"Rs.{cost['annual_maintenance_inr']:,.2f}", f"Rs.{cost['annual_maintenance_lakh']:.2f} Lakh"]
             ]
             cost_table = Table(cost_data, colWidths=[2*inch, 2*inch, 2*inch])
             cost_table.setStyle(TableStyle([
