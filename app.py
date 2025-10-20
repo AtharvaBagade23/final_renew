@@ -173,7 +173,7 @@ def calculate_solar_impact_and_cost(area_m2, suitability_score):
     PANEL_AREA = 2.0  # m² per panel (typical 400W panel)
     PANEL_CAPACITY = 0.4  # kW per panel
     USABLE_AREA_RATIO = 0.6  # 60% of area usable (spacing, access roads, etc.)
-    INSTALLATION_COST_PER_KW = 40000  # ₹40,000 per kW (India average)
+    INSTALLATION_COST_PER_KW = 40000  # Rs40,000 per kW (India average)
     MAINTENANCE_COST_YEARLY = 0.02  # 2% of installation cost per year
     CAPACITY_FACTOR = 0.19  # 19% average for India
     COAL_CO2_PER_KWH = 0.85  # kg CO2 per kWh from coal
@@ -254,7 +254,7 @@ def calculate_wind_impact_and_cost(area_m2, suitability_score, avg_wind_speed):
     # Constants
     TURBINE_SPACING = 250000  # m² per turbine (500m x 500m spacing)
     TURBINE_CAPACITY = 2500  # kW per turbine (2.5 MW)
-    INSTALLATION_COST_PER_KW = 60000  # ₹60,000 per kW (India average)
+    INSTALLATION_COST_PER_KW = 60000  # Rs60,000 per kW (India average)
     MAINTENANCE_COST_YEARLY = 0.03  # 3% of installation cost per year
     BASE_CAPACITY_FACTOR = 0.25  # 25% average for India
     COAL_CO2_PER_KWH = 0.85  # kg CO2 per kWh from coal
@@ -604,9 +604,9 @@ def generate_pdf_report(analysis_data):
             story.append(Paragraph("<b>Cost Analysis</b>", styles['Heading3']))
             cost = solar['cost']
             cost_data = [
-                ['Cost Component', 'Amount (₹)', 'Amount'],
-                ['Installation Cost', f"₹{cost['installation_inr']:,.2f}", f"₹{cost['installation_crore']:.2f} Crore"],
-                ['Annual Maintenance', f"₹{cost['annual_maintenance_inr']:,.2f}", f"₹{cost['annual_maintenance_lakh']:.2f} Lakh"]
+                ['Cost Component', 'Amount (Rs)', 'Amount'],
+                ['Installation Cost', f"Rs{cost['installation_inr']:,.2f}", f"Rs{cost['installation_crore']:.2f} Crore"],
+                ['Annual Maintenance', f"Rs{cost['annual_maintenance_inr']:,.2f}", f"Rs{cost['annual_maintenance_lakh']:.2f} Lakh"]
             ]
             cost_table = Table(cost_data, colWidths=[2*inch, 2*inch, 2*inch])
             cost_table.setStyle(TableStyle([
@@ -630,7 +630,7 @@ def generate_pdf_report(analysis_data):
             
             env_data = [
                 ['Impact Category', 'Annual', '25-Year Lifetime'],
-                ['CO₂ Emissions Avoided', f"{env['co2_reduction_yearly_tons']:,.2f} tons", 
+                ['CO2 Emissions Avoided', f"{env['co2_reduction_yearly_tons']:,.2f} tons", 
                  f"{env['co2_reduction_25years_tons']:,.2f} tons"],
                 ['Coal Dependency Reduced', f"{env['coal_saved_yearly_tons']:,.2f} tons", 
                  f"{env['coal_saved_yearly_tons'] * 25:,.2f} tons"],
@@ -731,9 +731,9 @@ def generate_pdf_report(analysis_data):
             story.append(Paragraph("<b>Cost Analysis</b>", styles['Heading3']))
             cost = wind['cost']
             cost_data = [
-                ['Cost Component', 'Amount (₹)', 'Amount'],
-                ['Installation Cost', f"₹{cost['installation_inr']:,.2f}", f"₹{cost['installation_crore']:.2f} Crore"],
-                ['Annual Maintenance', f"₹{cost['annual_maintenance_inr']:,.2f}", f"₹{cost['annual_maintenance_lakh']:.2f} Lakh"]
+                ['Cost Component', 'Amount (Rs)', 'Amount'],
+                ['Installation Cost', f"Rs{cost['installation_inr']:,.2f}", f"Rs{cost['installation_crore']:.2f} Crore"],
+                ['Annual Maintenance', f"Rs{cost['annual_maintenance_inr']:,.2f}", f"Rs{cost['annual_maintenance_lakh']:.2f} Lakh"]
             ]
             cost_table = Table(cost_data, colWidths=[2*inch, 2*inch, 2*inch])
             cost_table.setStyle(TableStyle([
@@ -757,7 +757,7 @@ def generate_pdf_report(analysis_data):
             
             env_data = [
                 ['Impact Category', 'Annual', '25-Year Lifetime'],
-                ['CO₂ Emissions Avoided', f"{env['co2_reduction_yearly_tons']:,.2f} tons", 
+                ['CO2 Emissions Avoided', f"{env['co2_reduction_yearly_tons']:,.2f} tons", 
                  f"{env['co2_reduction_25years_tons']:,.2f} tons"],
                 ['Coal Dependency Reduced', f"{env['coal_saved_yearly_tons']:,.2f} tons", 
                  f"{env['coal_saved_yearly_tons'] * 25:,.2f} tons"],
