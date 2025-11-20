@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # -------------------------
 # 2. Load Dataset
 # -------------------------
-DATA_PATH = "solar_synthetic_quarterly_yearly_2000.csv"
+DATA_PATH = "./Datasets/Solar_Sites_Dataset_India.csv"
 df = pd.read_csv(DATA_PATH)
 
 label_col = "Label (Yes/No)"
@@ -58,7 +58,37 @@ def train_model(verbose=True):
         print("======== MODEL PERFORMANCE ========")
         print("Accuracy:", round(accuracy_score(y_test, y_pred), 3))
         
-        # Feature Importance
+        # ----- Confusion Matrix -----
+        cm = confusion_matrix(y_test, y_pred)
+        print("\nConfusion Matrix:\n", cm)
+        
+        # Plot Confusion Matrix
+        plt.figure(figsize=(5,4))
+        plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+        plt.title("Confusion Matrix")
+        plt.colorbar()
+        tick_marks = np.arange(2)
+        plt.xticks(tick_marks, ['Predicted No', 'Predicted Yes'])
+        plt.yticks(tick_marks, ['Actual No', 'Actual Yes'])
+
+        # Add counts inside boxes
+        thresh = cm.max() / 2.
+        for i, j in np.ndindex(cm.shape):
+            plt.text(j, i, format(cm[i, j], 'd'),
+                     ha="center", va="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        plt.tight_layout()
+        plt.savefig("confusion_matrix.png")
+        print("\nConfusion matrix image saved as 'confusion_matrix.png'")
+
+        # ----- Classification Report -----
+        print("\nClassification Report:")
+        print(classification_report(y_test, y_pred, target_names=["No", "Yes"]))
+        
+        # ----- Feature Importance -----
         importances = rf.feature_importances_
         features = X.columns
         plt.figure(figsize=(10,6))
@@ -69,6 +99,18 @@ def train_model(verbose=True):
         plt.tight_layout()
         plt.savefig("feature_importance.png")
         print("\nFeature importance chart saved as 'feature_importance.png'")
+        
+        # ----- Interpretation -----
+        tn, fp, fn, tp = cm.ravel()
+        print("\n======== CONFUSION MATRIX EXPLANATION ========")
+        print(f"True Negatives (TN): {tn} → Correctly predicted unfeasible sites.")
+        print(f"False Positives (FP): {fp} → Predicted feasible but actually not.")
+        print(f"False Negatives (FN): {fn} → Missed feasible sites.")
+        print(f"True Positives (TP): {tp} → Correctly predicted feasible sites.\n")
+        print("Interpretation:")
+        print("- A high number of TP and TN indicates good model accuracy.")
+        print("- High FP means overestimating feasibility (risky).")
+        print("- High FN means missing good solar sites (lost opportunities).")
 
 # Train model immediately with no output
 train_model(verbose=False)

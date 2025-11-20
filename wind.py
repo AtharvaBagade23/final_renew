@@ -18,14 +18,14 @@ df[label_col] = df[label_col].map({"Yes": 1, "No": 0})
 # -------------------------
 # 2. Add Noise (~5%) to Reduce Overfitting
 # -------------------------
-noise_level = 0.12  
+noise_level = 0.35  
 numeric_cols = df.select_dtypes(include=np.number).columns.drop(label_col)
 
 for col in numeric_cols:
     df[col] += np.random.normal(0, noise_level * df[col].std(), size=len(df))
 
 # Slightly flip 5% of labels
-flip_rate = 0.05
+flip_rate = 0.10
 flip_indices = np.random.choice(df.index, size=int(len(df)*flip_rate), replace=False)
 df.loc[flip_indices, label_col] = 1 - df.loc[flip_indices, label_col]
 
@@ -51,22 +51,63 @@ def train_model(verbose=True):
     if verbose:
         # Evaluate Model
         y_pred = rf.predict(X_test)
-        print("======== MODEL PERFORMANCE ========")
-        print("Accuracy:", round(accuracy_score(y_test, y_pred), 3))
-        print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
-        print("\nClassification Report:\n", classification_report(y_test, y_pred))
+        acc = accuracy_score(y_test, y_pred)
+        cm = confusion_matrix(y_test, y_pred)
+        cr = classification_report(y_test, y_pred)
         
+        print("======== MODEL PERFORMANCE ========")
+        print(f"✅ Accuracy: {round(acc, 3)}")
+        print("\n🔹 Confusion Matrix (Raw Counts):\n", cm)
+        print("\n🔹 Classification Report:\n", cr)
+        
+        # -------------------------
+        # Confusion Matrix Visualization
+        # -------------------------
+        plt.figure(figsize=(5,4))
+        plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+        plt.title("Confusion Matrix - Wind Site Suitability")
+        plt.colorbar()
+        classes = ["No", "Yes"]
+        tick_marks = np.arange(len(classes))
+        plt.xticks(tick_marks, classes)
+        plt.yticks(tick_marks, classes)
+
+        # Add labels inside the squares
+        thresh = cm.max() / 2.
+        for i, j in np.ndindex(cm.shape):
+            plt.text(j, i, format(cm[i, j], "d"),
+                     ha="center", va="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+        plt.ylabel("True Label")
+        plt.xlabel("Predicted Label")
+        plt.tight_layout()
+        plt.savefig("wind_confusion_matrix.png")
+        print("\n📊 Confusion matrix saved as 'wind_confusion_matrix.png'")
+
+        # -------------------------
         # Feature Importance
+        # -------------------------
         importances = rf.feature_importances_
         features = X.columns
         plt.figure(figsize=(10,6))
         plt.barh(features, importances, color='skyblue')
         plt.xlabel("Feature Importance")
         plt.ylabel("Feature")
-        plt.title("Random Forest Feature Importance")
+        plt.title("Random Forest Feature Importance - Wind Site Suitability")
         plt.tight_layout()
         plt.savefig("wind_feature_importance.png")
-        print("\nFeature importance chart saved as 'wind_feature_importance.png'")
+        print("📈 Feature importance chart saved as 'wind_feature_importance.png'")
+
+        # -------------------------
+        # Explanation of Confusion Matrix
+        # -------------------------
+        print("\n======== CONFUSION MATRIX EXPLANATION ========")
+        print("🟩 True Positives (Bottom-right): Model correctly predicted 'Yes' sites as feasible.")
+        print("🟥 True Negatives (Top-left): Model correctly predicted 'No' sites as unfeasible.")
+        print("🟨 False Positives (Top-right): Model predicted 'Yes' for unfeasible sites.")
+        print("🟦 False Negatives (Bottom-left): Model predicted 'No' for feasible sites.")
+        print("\nA good model should have high values on the diagonal and low off-diagonal counts.")
 
 # Train model immediately with no output
 train_model(verbose=False)

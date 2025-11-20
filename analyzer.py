@@ -130,10 +130,8 @@ class DataExtractor:
         return result
 
     # ---------------- RESTRICTED AREA CHECK ---------------- #
-    def _check_restricted_area_detailed(self, polygon_coords: List[Tuple[float, float]], 
-                                       centroid_lat: float, centroid_lon: float) -> Dict:
-        """Enhanced restricted area check with detailed distance information"""
-        
+    def _check_restricted_area_detailed(self, polygon_coords: List[Tuple[float, float]], centroid_lat: float, centroid_lon: float) -> Dict:
+    
         min_lat = min(p[0] for p in polygon_coords) - 0.1
         max_lat = max(p[0] for p in polygon_coords) + 0.1
         min_lon = min(p[1] for p in polygon_coords) - 0.1
@@ -151,16 +149,16 @@ class DataExtractor:
         query = f"""
         [out:json][timeout:30];
         (
-          node["amenity"="school"]({min_lat},{min_lon},{max_lat},{max_lon});
-          node["amenity"="hospital"]({min_lat},{min_lon},{max_lat},{max_lon});
-          node["amenity"="kindergarten"]({min_lat},{min_lon},{max_lat},{max_lon});
-          node["aeroway"="aerodrome"]({min_lat},{min_lon},{max_lat},{max_lon});
-          way["aeroway"="aerodrome"]({min_lat},{min_lon},{max_lat},{max_lon});
-          node["landuse"="residential"]({min_lat},{min_lon},{max_lat},{max_lon});
-          way["landuse"="residential"]({min_lat},{min_lon},{max_lat},{max_lon});
-          node["military"]({min_lat},{min_lon},{max_lat},{max_lon});
-          way["military"]({min_lat},{min_lon},{max_lat},{max_lon});
-          node["historic"]({min_lat},{min_lon},{max_lat},{max_lon});
+        node["amenity"="school"]({min_lat},{min_lon},{max_lat},{max_lon});
+        node["amenity"="hospital"]({min_lat},{min_lon},{max_lat},{max_lon});
+        node["amenity"="kindergarten"]({min_lat},{min_lon},{max_lat},{max_lon});
+        node["aeroway"="aerodrome"]({min_lat},{min_lon},{max_lat},{max_lon});
+        way["aeroway"="aerodrome"]({min_lat},{min_lon},{max_lat},{max_lon});
+        node["landuse"="residential"]({min_lat},{min_lon},{max_lat},{max_lon});
+        way["landuse"="residential"]({min_lat},{min_lon},{max_lat},{max_lon});
+        node["military"]({min_lat},{min_lon},{max_lat},{max_lon});
+        way["military"]({min_lat},{min_lon},{max_lat},{max_lon});
+        node["historic"]({min_lat},{min_lon},{max_lat},{max_lon});
         );
         out center;
         """
@@ -172,78 +170,109 @@ class DataExtractor:
             "safe_distances_met": True
         }
         
-        try:
-            resp = requests.post(self.osm_url, data={"data": query}, timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
-            
-            for element in data.get("elements", []):
-                tags = element.get("tags", {})
-                
-                if "center" in element:
-                    elem_lat = element["center"]["lat"]
-                    elem_lon = element["center"]["lon"]
-                elif "lat" in element:
-                    elem_lat = element["lat"]
-                    elem_lon = element["lon"]
-                else:
-                    continue
-                
-                distance = self.haversine_distance(centroid_lat, centroid_lon, elem_lat, elem_lon)
-                
-                facility_type = None
-                facility_name = tags.get("name", "Unknown")
-                
-                if tags.get("amenity") == "school" or tags.get("amenity") == "kindergarten":
-                    facility_type = "school"
-                elif tags.get("amenity") == "hospital":
-                    facility_type = "hospital"
-                elif tags.get("aeroway") == "aerodrome":
-                    facility_type = "airport"
-                    facility_name = tags.get("name", "Airport")
-                elif tags.get("landuse") == "residential":
-                    facility_type = "residential"
-                elif tags.get("military"):
-                    facility_type = "military"
-                elif tags.get("historic"):
-                    facility_type = "heritage"
-                
-                if facility_type:
-                    safe_distance = SAFE_DISTANCES.get(facility_type, 1.0)
-                    is_violation = distance < safe_distance
-                    
-                    facility_info = {
-                        "type": facility_type,
-                        "name": facility_name,
-                        "distance_km": round(distance, 2),
-                        "safe_distance_km": safe_distance,
-                        "is_violation": is_violation
-                    }
-                    
-                    result["nearby_facilities"].append(facility_info)
-                    
-                    if is_violation:
-                        result["is_restricted"] = True
-                        result["safe_distances_met"] = False
-                        result["violations"].append({
-                            "facility": facility_name,
-                            "type": facility_type,
-                            "distance": round(distance, 2),
-                            "required_distance": safe_distance,
-                            "shortage": round(safe_distance - distance, 2)
-                        })
-            
-            result["nearby_facilities"].sort(key=lambda x: x["distance_km"])
-            
-            print(f"✓ Restriction check: {'RESTRICTED' if result['is_restricted'] else 'CLEAR'}")
-            print(f"  Found {len(result['nearby_facilities'])} nearby facilities")
-            if result["violations"]:
-                print(f"  ⚠️ {len(result['violations'])} safety violations detected")
-                
-        except Exception as e:
-            print(f"⚠️ Restriction check failed: {e}")
-            result["error"] = str(e)
+        # RETRY LOGIC WITH MULTIPLE ENDPOINTS
+        overpass_endpoints = [
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://overpass.openstreetmap.ru/api/interpreter",
+        ]
         
+        for attempt, endpoint in enumerate(overpass_endpoints, 1):
+            try:
+                print(f"   Attempt {attempt}: Trying {endpoint.split('/')[2]}...")
+                resp = requests.post(
+                    endpoint, 
+                    data={"data": query}, 
+                    timeout=45  # Increased timeout
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                
+                # Success! Process the data
+                for element in data.get("elements", []):
+                    tags = element.get("tags", {})
+                    
+                    if "center" in element:
+                        elem_lat = element["center"]["lat"]
+                        elem_lon = element["center"]["lon"]
+                    elif "lat" in element:
+                        elem_lat = element["lat"]
+                        elem_lon = element["lon"]
+                    else:
+                        continue
+                    
+                    distance = self.haversine_distance(centroid_lat, centroid_lon, elem_lat, elem_lon)
+                    
+                    facility_type = None
+                    facility_name = tags.get("name", "Unknown")
+                    
+                    if tags.get("amenity") == "school" or tags.get("amenity") == "kindergarten":
+                        facility_type = "school"
+                    elif tags.get("amenity") == "hospital":
+                        facility_type = "hospital"
+                    elif tags.get("aeroway") == "aerodrome":
+                        facility_type = "airport"
+                        facility_name = tags.get("name", "Airport")
+                    elif tags.get("landuse") == "residential":
+                        facility_type = "residential"
+                    elif tags.get("military"):
+                        facility_type = "military"
+                    elif tags.get("historic"):
+                        facility_type = "heritage"
+                    
+                    if facility_type:
+                        safe_distance = SAFE_DISTANCES.get(facility_type, 1.0)
+                        is_violation = distance < safe_distance
+                        
+                        facility_info = {
+                            "type": facility_type,
+                            "name": facility_name,
+                            "distance_km": round(distance, 2),
+                            "safe_distance_km": safe_distance,
+                            "is_violation": is_violation
+                        }
+                        
+                        result["nearby_facilities"].append(facility_info)
+                        
+                        if is_violation:
+                            result["is_restricted"] = True
+                            result["safe_distances_met"] = False
+                            result["violations"].append({
+                                "facility": facility_name,
+                                "type": facility_type,
+                                "distance": round(distance, 2),
+                                "required_distance": safe_distance,
+                                "shortage": round(safe_distance - distance, 2)
+                            })
+                
+                result["nearby_facilities"].sort(key=lambda x: x["distance_km"])
+                
+                print(f"✓ Restriction check: {'RESTRICTED' if result['is_restricted'] else 'CLEAR'}")
+                print(f"  Found {len(result['nearby_facilities'])} nearby facilities")
+                if result["violations"]:
+                    print(f"  ⚠️ {len(result['violations'])} safety violations detected")
+                
+                return result  # Success, return immediately
+                
+            except requests.exceptions.Timeout:
+                print(f"   ✗ Timeout on {endpoint.split('/')[2]}")
+                if attempt < len(overpass_endpoints):
+                    print(f"   ⏳ Waiting 3 seconds before retry...")
+                    import time
+                    time.sleep(3)
+                continue
+                
+            except Exception as e:
+                print(f"   ✗ Error: {str(e)[:100]}")
+                if attempt < len(overpass_endpoints):
+                    import time
+                    time.sleep(3)
+                continue
+        
+        # All endpoints failed
+        print(f"⚠️ All Overpass API endpoints failed")
+        result["error"] = "All API endpoints timed out or failed"
+        result["is_restricted"] = False  # Default to allowing if we can't check
         return result
 
     # ---------------- INFRASTRUCTURE ANALYSIS ---------------- #
